@@ -284,7 +284,18 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
 			polygons += inner_arc(-2*lane_w, 0, 0, 2*lane_w, -2*lane_w, 2*lane_w, lane_w, -90, 0, num_points=3)
 			polygons += rect(-lane_w, 0, 2*lane_w, d)
+	print("got %s: return %s" % (neighbors, polygons))
+	print()
 	return polygons
+
+# https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+def make_counter_clockwise(polygon):
+	esum = 0
+	for pi in range(len(polygon)):
+		x1, y1 = polygon[pi]
+		x2, y2 = polygon[pi+1] if pi != len(polygon)-1 else polygon[0]
+		esum += (x2-x1)*(y2+y1)
+	return polygon if esum <= 0 else polygon[::-1]
 
 def construct_grid(lattice, lane_w, edge_length):
 	h, w = lattice.shape[0:2]
@@ -295,6 +306,7 @@ def construct_grid(lattice, lane_w, edge_length):
 				curr_y, curr_x = i*edge_length, j*edge_length
 				polygons = construct_polygons(lattice[i][j], lane_w, edge_length/2)
 				polygons = [map(lambda pt: translate(pt, curr_x, curr_y), polygon) for polygon in polygons]
+				polygons = map(make_counter_clockwise, polygons)
 				# Inversion should not be needed
 				all_polygons += polygons
 	return all_polygons
