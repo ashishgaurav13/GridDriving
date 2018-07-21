@@ -59,7 +59,7 @@ class Car:
                 fixtureDef(shape = polygonShape(vertices=[ (x*SIZE,y*SIZE) for x,y in HULL_POLY4 ]), density=1.0)
                 ]
             )
-        self.hull.color = (0.8,0.0,0.0)
+        self.hull.color = (0.9, 0.9, 0.9)
         self.wheels = []
         self.fuel_spent = 0.0
         WHEEL_POLY = [

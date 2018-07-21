@@ -10,7 +10,7 @@ import gym
 from gym import spaces
 from car_dynamics import Car
 from gym.utils import colorize, seeding
-from grid_utils import construct_lattice, construct_grid
+from grid_utils import construct_lattice, construct_grid, translate
 
 import pyglet
 from pyglet import gl
@@ -20,16 +20,18 @@ from pyglet import gl
 # Modified by Ashish Gaurav.
 
 STATE_W, STATE_H = 96, 96
-VIDEO_W, VIDEO_H = 700, 700
-WINDOW_W, WINDOW_H = 700, 700
+VIDEO_W, VIDEO_H = 1300, 700
+WINDOW_W, WINDOW_H = 1300, 700
+GRID_COLS, GRID_ROWS = 8, 4
+PROB_EDGE = 0.6
 
-PLAYFIELD   = 600        # Game over boundary
+PLAYFIELD   = 1300        # Game over boundary
 FPS         = 50
 ZOOM        = 1          # Camera zoom
 ZOOM_FOLLOW = False      # Set to False for fixed view (don't use zoom)
 
 LANE_WIDTH = 25
-EDGE_WIDTH = 100
+EDGE_WIDTH = 150
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
@@ -110,13 +112,13 @@ class CarGridDriving(gym.Env):
         self.car.destroy()
 
     def _create_track(self):
-        lattice = construct_lattice(4, 4)
-        grid_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH)
+        self.off_params = (-WINDOW_H//4, -WINDOW_W//2.5)
+        lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE)
+        grid_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params)
         self.road = []
 
         i = 0
         for polygon in grid_polygons:
-            print(list(polygon))
             t = self.world.CreateStaticBody(fixtures = fixtureDef(
                 shape=polygonShape(vertices=list(polygon))
                 ))
@@ -129,7 +131,16 @@ class CarGridDriving(gym.Env):
             t.fixtures[0].sensor = True
             self.road_poly.append(( list(polygon), t.color ))
             self.road.append(t)
+        self.lattice = lattice
         self.track = grid_polygons
+
+        # which vertices are in the lattice?
+        h, w = GRID_ROWS, GRID_COLS
+        self.which_points = []
+        for i in range(h):
+            for j in range(w):
+                if lattice[i, j, 0]:
+                    self.which_points += [(i, j)]
         return True
 
     def reset(self):
@@ -145,7 +156,12 @@ class CarGridDriving(gym.Env):
             success = self._create_track()
             if success: break
             print("retry to generate track (normal if there are not many of this messages)")
-        self.car = Car(self.world, 0, 50, 50)
+        
+        # randomly init car
+        ri, rj = self.which_points[np.random.randint(len(self.which_points))]
+        y, x = ri*EDGE_WIDTH, rj*EDGE_WIDTH
+        x, y = translate((x, y), self.off_params[1], self.off_params[0])
+        self.car = Car(self.world, math.pi, x, y)
 
         return self.step(None)[0]
 
@@ -191,7 +207,7 @@ class CarGridDriving(gym.Env):
 
         if "t" not in self.__dict__: return  # reset() not called yet
 
-        self.transform.set_translation(WINDOW_H/2, WINDOW_W/2)
+        self.transform.set_translation(WINDOW_W/2, WINDOW_H/2)
 
         self.car.draw(self.viewer, mode!="state_pixels")
 

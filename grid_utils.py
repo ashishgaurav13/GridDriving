@@ -1,27 +1,56 @@
 import sys, math
 import numpy as np
 import random
+from collections import deque
+
+# BFS to check graph connectivity
+def BFS(lattice):
+	h, w = lattice.shape
+	tovisit = None
+	for i in range(h):
+		for j in range(w):
+			if lattice[i][j]:
+				tovisit = deque([(0, 0)])
+	if not tovisit: return False # empty graph
+	n = np.sum(lattice)
+	visited = set()
+	while len(tovisit) > 0:
+		curr = tovisit.popleft()
+		visited.add(curr)
+		i, j = curr
+		if i-1 >= 0 and (i-1, j) not in visited and lattice[i-1, j]:
+			tovisit.append((i-1, j))
+		if i+1 < h and (i+1, j) not in visited and lattice[i+1, j]:
+			tovisit.append((i+1, j))
+		if j-1 >= 0 and (i, j-1) not in visited and lattice[i, j-1]:
+			tovisit.append((i, j-1))
+		if j+1 < w and (i, j+1) not in visited and lattice[i, j+1]:
+			tovisit.append((i, j+1))
+	return len(visited) == n
 
 # Lattice is a set of h x w points, randomly set or unset. We also 
 # encode neighbor information. Overall the dimensionality is
 # h x w x 5, where (i, j, 0) denotes value of point (i, j). while
 # (i, j, 1:4) denote values of neighbors going top, right, bottom, left.
-def construct_lattice(h, w):
+def construct_lattice(h, w, p):
 	lattice = np.zeros(shape=(h, w, 5), dtype=bool)
+	is_connected = False
+	while not is_connected:
+		for i in range(h):
+			for j in range(w):
+				lattice[i][j][0] = bool(np.random.choice(2, 1, p=[1-p, p])[0])
+		is_connected = BFS(lattice[:, :, 0])
 	for i in range(h):
 		for j in range(w):
-			lattice[i][j][0] = bool(random.getrandbits(1))
-	for i in range(h):
-		for j in range(w):
-			# update top neighbor
+			# update bottom neighbor
 			if i-1 >= 0:
-				lattice[i-1][j][3] = lattice[i][j][0]
+				lattice[i-1][j][1] = lattice[i][j][0]
 			# update right neighbor
 			if j+1 < w:
 				lattice[i][j+1][4] = lattice[i][j][0]
-			# update bottom neighbor
+			# update top neighbor
 			if i+1 < h:
-				lattice[i+1][j][1] = lattice[i][j][0]
+				lattice[i+1][j][3] = lattice[i][j][0]
 			# update left neighbor
 			if j-1 >= 0:
 				lattice[i][j-1][2] = lattice[i][j][0]
@@ -58,7 +87,8 @@ def outer_arc(cx, cy, r, A, B, num_points=5):
 	final_polygons = []
 	for si in range(num_points-1):
 		# choose sector
-		final_polygons.append([(cx, cy), arc_pts[si], arc_pts[si+1]])
+		# Hack: having 4 points instead of 3 guarantees that polygon shows up
+		final_polygons.append([(cx, cy), (cx, cy), arc_pts[si], arc_pts[si+1]])
 	return final_polygons
 
 # B-A = 90 degrees and A, B must be in multiples of 90
@@ -104,7 +134,7 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 				polygons.append([(x1+pi*step,y1), (x1+(pi+1)*step,y1), arc_pts[si+1], arc_pts[si]])
 				si += 1
 			for pi in range(half_num_points):
-				polygons.append([(x2,y1+pi*step), (x2,y1+(pi+1)*step,y1), arc_pts[si+1], arc_pts[si]])
+				polygons.append([(x2,y1+pi*step), (x2,y1+(pi+1)*step), arc_pts[si+1], arc_pts[si]])
 				si += 1
 		if middle_pentagon: # even
 			half_num_points = num_points//2
@@ -131,7 +161,7 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 				polygons.append([(x2,y1+pi*step), (x2,y1+(pi+1)*step), arc_pts[si+1], arc_pts[si]])
 				si += 1
 			for pi in range(half_num_points):
-				polygons.append([(x2-pi*step,y2), (x2-(pi+1)*step,y1), arc_pts[si+1], arc_pts[si]])
+				polygons.append([(x2-pi*step,y2), (x2-(pi+1)*step,y2), arc_pts[si+1], arc_pts[si]])
 				si += 1
 		if middle_pentagon: # even
 			half_num_points = num_points//2
@@ -284,8 +314,6 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
 			polygons += inner_arc(-2*lane_w, 0, 0, 2*lane_w, -2*lane_w, 2*lane_w, lane_w, -90, 0, num_points=3)
 			polygons += rect(-lane_w, 0, 2*lane_w, d)
-	print("got %s: return %s" % (neighbors, polygons))
-	print()
 	return polygons
 
 # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
@@ -297,16 +325,18 @@ def make_counter_clockwise(polygon):
 		esum += (x2-x1)*(y2+y1)
 	return polygon if esum <= 0 else polygon[::-1]
 
-def construct_grid(lattice, lane_w, edge_length):
+def construct_grid(lattice, lane_w, edge_length, off_params):
 	h, w = lattice.shape[0:2]
+	h_off, w_off = off_params
 	all_polygons = []
 	for i in range(h):
 		for j in range(w):
 			if lattice[i][j][0]:
 				curr_y, curr_x = i*edge_length, j*edge_length
 				polygons = construct_polygons(lattice[i][j], lane_w, edge_length/2)
-				polygons = [map(lambda pt: translate(pt, curr_x, curr_y), polygon) for polygon in polygons]
+				polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in polygons]
 				polygons = map(make_counter_clockwise, polygons)
+				polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in polygons]
 				# Inversion should not be needed
 				all_polygons += polygons
 	return all_polygons
