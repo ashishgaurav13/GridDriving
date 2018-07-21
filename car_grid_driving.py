@@ -10,6 +10,7 @@ import gym
 from gym import spaces
 from car_dynamics import Car
 from gym.utils import colorize, seeding
+from grid_utils import construct_lattice, construct_grid
 
 import pyglet
 from pyglet import gl
@@ -22,19 +23,13 @@ STATE_W, STATE_H = 96, 96
 VIDEO_W, VIDEO_H = 700, 700
 WINDOW_W, WINDOW_H = 700, 700
 
-SCALE       = 1.0        # Track scale
-TRACK_RAD   = 200/SCALE  # Track is heavily morphed circle with this radius
-PLAYFIELD   = 600/SCALE # Game over boundary
+PLAYFIELD   = 600        # Game over boundary
 FPS         = 50
 ZOOM        = 1          # Camera zoom
 ZOOM_FOLLOW = False      # Set to False for fixed view (don't use zoom)
 
-
-TRACK_DETAIL_STEP = 5/SCALE
-TRACK_TURN_RATE = 0.31
-TRACK_WIDTH = 25/SCALE
-BORDER = 8/SCALE
-BORDER_MIN_COUNT = 4
+LANE_WIDTH = 25
+EDGE_WIDTH = 100
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
@@ -114,152 +109,27 @@ class CarGridDriving(gym.Env):
         self.road = []
         self.car.destroy()
 
-    def _create_checkpoints(self, num_checkpoints):
-        CHECKPOINTS = num_checkpoints
-        checkpoints = []
-        for c in range(CHECKPOINTS):
-            alpha = 2*math.pi*c/CHECKPOINTS + self.np_random.uniform(0, 2*math.pi*1/CHECKPOINTS)
-            rad = self.np_random.uniform(TRACK_RAD/3, TRACK_RAD)
-            if c==0:
-                alpha = 0
-                rad = 1.5*TRACK_RAD
-            if c==CHECKPOINTS-1:
-                alpha = 2*math.pi*c/CHECKPOINTS
-                self.start_alpha = 2*math.pi*(-0.5)/CHECKPOINTS
-                rad = 1.5*TRACK_RAD
-            checkpoints.append( (alpha, rad*math.cos(alpha), rad*math.sin(alpha)) )
-        #print "\n".join(str(h) for h in checkpoints)
-        # self.road_poly = [ (    # uncomment this to see checkpoints
-        #    [ (tx,ty) for a,tx,ty in checkpoints ],
-        #    (0.7,0.7,0.9) ) ]
-        return checkpoints
-
     def _create_track(self):
-        # Create checkpoints
-        checkpoints = self._create_checkpoints(num_checkpoints=12)
-
+        lattice = construct_lattice(4, 4)
+        grid_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH)
         self.road = []
 
-        # Go from one checkpoint to another to create track
-        x, y, beta = 1.5*TRACK_RAD, 0, 0
-        dest_i = 0
-        laps = 0
-        track = []
-        no_freeze = 2500
-        visited_other_side = False
-        while 1:
-            alpha = math.atan2(y, x)
-            if visited_other_side and alpha > 0:
-                laps += 1
-                visited_other_side = False
-            if alpha < 0:
-                visited_other_side = True
-                alpha += 2*math.pi
-            while True: # Find destination from checkpoints
-                failed = True
-                while True:
-                    dest_alpha, dest_x, dest_y = checkpoints[dest_i % len(checkpoints)]
-                    if alpha <= dest_alpha:
-                        failed = False
-                        break
-                    dest_i += 1
-                    if dest_i % len(checkpoints) == 0: break
-                if not failed: break
-                alpha -= 2*math.pi
-                continue
-            r1x = math.cos(beta)
-            r1y = math.sin(beta)
-            p1x = -r1y
-            p1y = r1x
-            dest_dx = dest_x - x  # vector towards destination
-            dest_dy = dest_y - y
-            proj = r1x*dest_dx + r1y*dest_dy  # destination vector projected on rad
-            while beta - alpha >  1.5*math.pi: beta -= 2*math.pi
-            while beta - alpha < -1.5*math.pi: beta += 2*math.pi
-            prev_beta = beta
-            proj *= SCALE
-            if proj >  0.3: beta -= min(TRACK_TURN_RATE, abs(0.001*proj))
-            if proj < -0.3: beta += min(TRACK_TURN_RATE, abs(0.001*proj))
-            x += p1x*TRACK_DETAIL_STEP
-            y += p1y*TRACK_DETAIL_STEP
-            track.append( (alpha,prev_beta*0.5 + beta*0.5,x,y) )
-            if laps > 4: break
-            no_freeze -= 1
-            if no_freeze==0: break
-        #print "\n".join([str(t) for t in enumerate(track)])
-
-        # Find closed loop range i1..i2, first loop should be ignored, second is OK
-        i1, i2 = -1, -1
-        i = len(track)
-        while True:
-            i -= 1
-            if i==0: return False  # Failed
-            pass_through_start = track[i][0] > self.start_alpha and track[i-1][0] <= self.start_alpha
-            if pass_through_start and i2==-1:
-                i2 = i
-            elif pass_through_start and i1==-1:
-                i1 = i
-                break
-        print("Track generation: %i..%i -> %i-tiles track" % (i1, i2, i2-i1))
-        assert i1!=-1
-        assert i2!=-1
-
-        track = track[i1:i2-1]
-
-        first_beta = track[0][1]
-        first_perp_x = math.cos(first_beta)
-        first_perp_y = math.sin(first_beta)
-        # Length of perpendicular jump to put together head and tail
-        well_glued_together = np.sqrt(
-            np.square( first_perp_x*(track[0][2] - track[-1][2]) ) +
-            np.square( first_perp_y*(track[0][3] - track[-1][3]) ))
-        if well_glued_together > TRACK_DETAIL_STEP:
-            return False
-
-        # Red-white border on hard turns
-        border = [False]*len(track)
-        for i in range(len(track)):
-            good = True
-            oneside = 0
-            for neg in range(BORDER_MIN_COUNT):
-                beta1 = track[i-neg-0][1]
-                beta2 = track[i-neg-1][1]
-                good &= abs(beta1 - beta2) > TRACK_TURN_RATE*0.2
-                oneside += np.sign(beta1 - beta2)
-            good &= abs(oneside) == BORDER_MIN_COUNT
-            border[i] = good
-        for i in range(len(track)):
-            for neg in range(BORDER_MIN_COUNT):
-                border[i-neg] |= border[i]
-
-        # Create tiles
-        print(track)
-        for i in range(len(track)):
-            alpha1, beta1, x1, y1 = track[i]
-            alpha2, beta2, x2, y2 = track[i-1]
-            road1_l = (x1 - TRACK_WIDTH*math.cos(beta1), y1 - TRACK_WIDTH*math.sin(beta1))
-            road1_r = (x1 + TRACK_WIDTH*math.cos(beta1), y1 + TRACK_WIDTH*math.sin(beta1))
-            road2_l = (x2 - TRACK_WIDTH*math.cos(beta2), y2 - TRACK_WIDTH*math.sin(beta2))
-            road2_r = (x2 + TRACK_WIDTH*math.cos(beta2), y2 + TRACK_WIDTH*math.sin(beta2))
-            t = self.world.CreateStaticBody( fixtures = fixtureDef(
-                shape=polygonShape(vertices=[road1_l, road1_r, road2_r, road2_l])
+        i = 0
+        for polygon in grid_polygons:
+            print(list(polygon))
+            t = self.world.CreateStaticBody(fixtures = fixtureDef(
+                shape=polygonShape(vertices=list(polygon))
                 ))
             t.userData = t
             c = 0.01*(i%3)
+            i += 1
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
             t.road_visited = False
             t.road_friction = 1.0
             t.fixtures[0].sensor = True
-            self.road_poly.append(( [road1_l, road1_r, road2_r, road2_l], t.color ))
+            self.road_poly.append(( list(polygon), t.color ))
             self.road.append(t)
-            if border[i]:
-                side = np.sign(beta2 - beta1)
-                b1_l = (x1 + side* TRACK_WIDTH        *math.cos(beta1), y1 + side* TRACK_WIDTH        *math.sin(beta1))
-                b1_r = (x1 + side*(TRACK_WIDTH+BORDER)*math.cos(beta1), y1 + side*(TRACK_WIDTH+BORDER)*math.sin(beta1))
-                b2_l = (x2 + side* TRACK_WIDTH        *math.cos(beta2), y2 + side* TRACK_WIDTH        *math.sin(beta2))
-                b2_r = (x2 + side*(TRACK_WIDTH+BORDER)*math.cos(beta2), y2 + side*(TRACK_WIDTH+BORDER)*math.sin(beta2))
-                self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
-        self.track = track
+        self.track = grid_polygons
         return True
 
     def reset(self):
@@ -275,7 +145,7 @@ class CarGridDriving(gym.Env):
             success = self._create_track()
             if success: break
             print("retry to generate track (normal if there are not many of this messages)")
-        self.car = Car(self.world, *self.track[0][1:4])
+        self.car = Car(self.world, 0, 50, 50)
 
         return self.step(None)[0]
 
@@ -321,20 +191,6 @@ class CarGridDriving(gym.Env):
 
         if "t" not in self.__dict__: return  # reset() not called yet
 
-        # zoom = 0.1*SCALE*max(1-self.t, 0) + ZOOM*SCALE*min(self.t, 1)   # Animate zoom first second
-        # zoom_state  = ZOOM*SCALE*STATE_W/WINDOW_W
-        # zoom_video  = ZOOM*SCALE*VIDEO_W/WINDOW_W
-        # scroll_x = self.car.hull.position[0]
-        # scroll_y = self.car.hull.position[1]
-        # angle = -self.car.hull.angle
-        # vel = self.car.hull.linearVelocity
-        # if np.linalg.norm(vel) > 0.5:
-        #    angle = math.atan2(vel[0], vel[1])
-        # self.transform.set_scale(zoom, zoom)
-        # self.transform.set_translation(
-        #    WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
-        #    WINDOW_H/4 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
-        # self.transform.set_rotation(angle)
         self.transform.set_translation(WINDOW_H/2, WINDOW_W/2)
 
         self.car.draw(self.viewer, mode!="state_pixels")

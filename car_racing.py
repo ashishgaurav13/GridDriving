@@ -233,7 +233,6 @@ class CarRacing(gym.Env):
                 border[i-neg] |= border[i]
 
         # Create tiles
-        print(track)
         for i in range(len(track)):
             alpha1, beta1, x1, y1 = track[i]
             alpha2, beta2, x2, y2 = track[i-1]
