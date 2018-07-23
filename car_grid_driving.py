@@ -31,9 +31,11 @@ ZOOM        = 1          # Camera zoom
 ZOOM_FOLLOW = False      # Set to False for fixed view (don't use zoom)
 
 LANE_WIDTH = 25
+LANE_SEP = 1
 EDGE_WIDTH = 150
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
+LANE_SEP_COLOR = [1, 1, 1]
 
 class FrictionDetector(contactListener):
 
@@ -62,6 +64,7 @@ class FrictionDetector(contactListener):
         # show a streak behind the object with color ROAD_COLOR
         tile.color = ROAD_COLOR[:]
         if not obj or "tiles" not in obj.__dict__: return
+        if tile.boxtype == "lane-sep": return
         if begin:
             obj.tiles.add(tile)
             if not tile.road_visited:
@@ -114,9 +117,10 @@ class CarGridDriving(gym.Env):
     def _create_track(self):
         self.off_params = (-WINDOW_H//4, -WINDOW_W//2.5)
         lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE)
-        grid_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params)
+        grid_polygons, ls_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
         self.road = []
 
+        # draw track
         i = 0
         for polygon in grid_polygons:
             t = self.world.CreateStaticBody(fixtures = fixtureDef(
@@ -126,6 +130,7 @@ class CarGridDriving(gym.Env):
             c = 0.01*(i%3)
             i += 1
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
+            t.boxtype = "road"
             t.road_visited = False
             t.road_friction = 1.0
             t.fixtures[0].sensor = True
@@ -133,6 +138,19 @@ class CarGridDriving(gym.Env):
             self.road.append(t)
         self.lattice = lattice
         self.track = grid_polygons
+
+        # lane separators
+        for polygon in ls_polygons:
+            t = self.world.CreateStaticBody(fixtures = fixtureDef(
+                shape=polygonShape(vertices=list(polygon))
+                ))
+            t.userData = t
+            t.color = LANE_SEP_COLOR[:]
+            t.boxtype = "lane-sep"
+            t.road_friction = 1.0
+            t.fixtures[0].sensor = True
+            self.road_poly.append(( list(polygon), t.color ))
+            self.road.append(t)
 
         # which vertices are in the lattice?
         h, w = GRID_ROWS, GRID_COLS

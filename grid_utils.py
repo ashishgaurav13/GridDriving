@@ -56,6 +56,21 @@ def construct_lattice(h, w, p):
 				lattice[i][j-1][2] = lattice[i][j][0]
 	return lattice
 
+# Create lanes for each edge from this point, leaving 2*lane_w
+# on each side; d is the half edge
+def generate_lane_sep(pt_info, lane_w, d, lane_sep):
+	lane_polygons = []
+	if pt_info[0]:
+		if pt_info[1]:
+			lane_polygons += rect(-lane_sep, lane_sep, 2*lane_w, d)
+		if pt_info[2]:
+			lane_polygons += rect(2*lane_w, d, -lane_sep, lane_sep)
+		if pt_info[3]:
+			lane_polygons += rect(-lane_sep, lane_sep, -d, -2*lane_w)
+		if pt_info[4]:
+			lane_polygons += rect(-d, -2*lane_w, -lane_sep, lane_sep)
+	return lane_polygons
+
 # given center (cx, cy) and radius r, find a set of points
 # that approximates the arc between angle A and angle B
 # where B >= A (degrees); find num_points number of points
@@ -325,18 +340,25 @@ def make_counter_clockwise(polygon):
 		esum += (x2-x1)*(y2+y1)
 	return polygon if esum <= 0 else polygon[::-1]
 
-def construct_grid(lattice, lane_w, edge_length, off_params):
+def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 	h, w = lattice.shape[0:2]
 	h_off, w_off = off_params
 	all_polygons = []
+	lane_sep_polygons = []
 	for i in range(h):
 		for j in range(w):
 			if lattice[i][j][0]:
 				curr_y, curr_x = i*edge_length, j*edge_length
-				polygons = construct_polygons(lattice[i][j], lane_w, edge_length/2)
+				polygons = construct_polygons(lattice[i, j], lane_w, edge_length/2)
 				polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in polygons]
 				polygons = map(make_counter_clockwise, polygons)
 				polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in polygons]
+				# Lane separator polygons
+				ls_polygons = generate_lane_sep(lattice[i, j], lane_w, edge_length/2, lane_sep)
+				ls_polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in ls_polygons]
+				ls_polygons = map(make_counter_clockwise, ls_polygons)
+				ls_polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in ls_polygons]
 				# Inversion should not be needed
 				all_polygons += polygons
-	return all_polygons
+				lane_sep_polygons += ls_polygons
+	return all_polygons, lane_sep_polygons
