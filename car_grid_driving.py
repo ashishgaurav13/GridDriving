@@ -64,6 +64,7 @@ class FrictionDetector(contactListener):
         # show a streak behind the object with color ROAD_COLOR
         tile.color = ROAD_COLOR[:]
         if not obj or "tiles" not in obj.__dict__: return
+        if tile.boxtype == "lane-sep": return
         if begin:
             obj.tiles.add(tile)
             if not tile.road_visited:
@@ -129,6 +130,7 @@ class CarGridDriving(gym.Env):
             c = 0.01*(i%3)
             i += 1
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
+            t.boxtype = "road"
             t.road_visited = False
             t.road_friction = 1.0
             t.fixtures[0].sensor = True
@@ -144,8 +146,9 @@ class CarGridDriving(gym.Env):
                 ))
             t.userData = t
             t.color = LANE_SEP_COLOR[:]
+            t.boxtype = "lane-sep"
             t.road_friction = 1.0
-            t.fixtures[0].sensor = False
+            t.fixtures[0].sensor = True
             self.road_poly.append(( list(polygon), t.color ))
             self.road.append(t)
 
