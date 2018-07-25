@@ -224,6 +224,41 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 				si += 1
 	return polygons
 
+# shape is a circle and a triangle within
+# 4 states: straight, left, right, stop
+# types: slr, lr, sr, sl
+class TrafficLight:
+	# pos = how much to translate
+	# state cycle defines transition, happens every 3 sec
+	def __init__(self, pos, state_cycle, lane_w, limit=100):
+		self.state_cycle = state_cycle
+		self.state_idx = 0
+		self.limit = limit
+		self.idx = 0
+		self.circle = arc_points(0, 330, 0, 0, lane_w//4, num_points=12)
+		self.circle = [translate(pt, *pos) for pt in self.circle]
+		# any sign is 0.05lw away from edge
+		# diag of rect is 0.25lw*2-0.05lw*2=0.40lw /2=> 0.20lw /sqrt2=>0.1414lw
+		half_side = int(0.1414*lane_w)
+		self.rect = rect(-half_side, half_side, -half_side, half_side)
+		self.rect = [translate(pt, *pos) for pt in self.rect]
+		self.right = arc_points(0, 240, 0, 0, lane_w//5, num_points=3)
+		self.right += [self.right[-1]]
+		self.right = [translate(pt, *pos) for pt in self.right]
+		self.straight = arc_points(90, 330, 0, 0, lane_w//5, num_points=3)
+		self.straight += [self.straight[-1]]
+		self.straight = [translate(pt, *pos) for pt in self.straight]
+		self.left = arc_points(60, 300, 0, 0, lane_w//5, num_points=3)
+		self.left += [self.left[-1]]
+		self.left = [translate(pt, *pos) for pt in self.left]
+
+	def get_poly():
+		curr_state = self.state_cycle[self.state_idx]
+		if curr_state == "stop":
+			to_return = self.rect
+		elif curr_state == "straight":
+
+
 # Given 5 values for a point (1 for itself and 4 for neighbors)
 # construct polygons needed to draw this out; Lane width is lane_w
 # and from this point draw only until distance d (half edge)
