@@ -17,25 +17,21 @@ def BFS(lattice, edges=None):
 	if len(tovisit) == 0: return False # empty graph
 	n = np.sum(lattice)
 	visited = set()
-	if edges:
-		print(edges)
 	while len(tovisit) > 0:
 		curr = tovisit.popleft()
 		visited.add(curr)
 		i, j = curr
-		if edges:
-			print(edges)
 		if i-1 >= 0 and (i-1, j) not in visited and lattice[i-1, j]:
-			if not edges or (edges and ((i-1, j, i, j, 1) in edges or (i, j, i-1, j, 3) in edges)):
+			if not edges or (not (edges and ((i-1, j, i, j, 1) in edges or (i, j, i-1, j, 3) in edges))):
 				tovisit.append((i-1, j))
 		if i+1 < h and (i+1, j) not in visited and lattice[i+1, j]:
-			if not edges or (edges and ((i+1, j, i, j, 3) in edges or (i, j, i+1, j, 1) in edges)):
+			if not edges or (not (edges and ((i+1, j, i, j, 3) in edges or (i, j, i+1, j, 1) in edges))):
 				tovisit.append((i+1, j))
 		if j-1 >= 0 and (i, j-1) not in visited and lattice[i, j-1]:
-			if not edges or (edges and ((i, j-1, i, j, 2) in edges or (i, j, i, j-1, 4) in edges)):
+			if not edges or (not (edges and ((i, j-1, i, j, 2) in edges or (i, j, i, j-1, 4) in edges))):
 				tovisit.append((i, j-1))
 		if j+1 < w and (i, j+1) not in visited and lattice[i, j+1]:
-			if not edges or (edges and ((i, j+1, i, j, 4) in edges or (i, j, i, j+1, 2) in edges)):
+			if not edges or (not (edges and ((i, j+1, i, j, 4) in edges or (i, j, i, j+1, 2) in edges))):
 				tovisit.append((i, j+1))
 	return len(visited) == n
 
@@ -95,7 +91,7 @@ def do_random_deletions(lattice, edges_orig, n, constraints, max_tries=1000):
 	while num_tries < max_tries:
 		new_lattice = deepcopy(lattice)
 		edges = deepcopy(edges_orig)
-		edges_to_delete = edges[np.random.choice(len(edges), n, replace=False)]
+		edges_to_delete = edges[np.random.choice(len(edges), n, replace=False)].tolist()
 		for (a, b, c, d, _) in edges_to_delete:
 			if a+1 == c: ntype, otype = 1, 3
 			if b-1 == d: ntype, otype = 4, 2
@@ -104,7 +100,7 @@ def do_random_deletions(lattice, edges_orig, n, constraints, max_tries=1000):
 			new_lattice[a][b][ntype] = False
 			new_lattice[c][d][otype] = False
 		new_edges = []
-		edges = list(edges)
+		edges = edges.tolist()
 		for edge in edges:
 			if edge not in edges_to_delete:
 				new_edges.append(edge)

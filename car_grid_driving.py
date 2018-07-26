@@ -231,19 +231,19 @@ class CarGridDriving(gym.Env):
 
         if "t" not in self.__dict__: return  # reset() not called yet
 
-        # zoom = 0.1*SCALE*max(1-self.t, 0) + ZOOM*SCALE*min(self.t, 1)   # Animate zoom first second
-        # scroll_x = self.car.hull.position[0]
-        # scroll_y = self.car.hull.position[1]
-        # angle = -self.car.hull.angle
-        # vel = self.car.hull.linearVelocity
-        # if np.linalg.norm(vel) > 0.5:
-        #    angle = math.atan2(vel[0], vel[1])
-        # self.transform.set_scale(zoom, zoom)
-        # self.transform.set_translation(
-        #    WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
-        #    WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
-        # self.transform.set_rotation(angle)
-        self.transform.set_translation(WINDOW_W/2, WINDOW_H/2)
+        zoom = 0.1*SCALE*max(1-self.t, 0) + ZOOM*SCALE*min(self.t, 1)   # Animate zoom first second
+        scroll_x = self.car.hull.position[0]
+        scroll_y = self.car.hull.position[1]
+        angle = -self.car.hull.angle
+        vel = self.car.hull.linearVelocity
+        if np.linalg.norm(vel) > 0.5:
+           angle = math.atan2(vel[0], vel[1])
+        self.transform.set_scale(zoom, zoom)
+        self.transform.set_translation(
+           WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
+           WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
+        self.transform.set_rotation(angle)
+        # self.transform.set_translation(WINDOW_W/2, WINDOW_H/2)
 
         # iterate through traffic lights
         for i, point in enumerate(self.which_points):
