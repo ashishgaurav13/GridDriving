@@ -10,7 +10,7 @@ import gym
 from gym import spaces
 from car_dynamics import Car
 from gym.utils import colorize, seeding
-from grid_utils import construct_lattice, construct_grid, translate
+from grid_utils import *
 
 import pyglet
 from pyglet import gl
@@ -19,23 +19,32 @@ from pyglet import gl
 # Licensed on the same terms as the rest of OpenAI Gym.
 # Modified by Ashish Gaurav.
 
-STATE_W, STATE_H = 96, 96
-VIDEO_W, VIDEO_H = 1300, 700
-WINDOW_W, WINDOW_H = 1300, 700
+STATE_W, STATE_H = 256, 256
+VIDEO_W, VIDEO_H = 900, 500
+# WINDOW_W, WINDOW_H = VIDEO_W, VIDEO_H
+WINDOW_W, WINDOW_H = 512, 512
 GRID_COLS, GRID_ROWS = 8, 4
-PROB_EDGE = 0.6
+PROB_EDGE = 0.75
+RANDOM_DELETIONS = 12
+LATTICE_CONSTRAINTS = [(0, 0), (0, 0), (0, np.inf), (2, np.inf), (2, np.inf)]
 
-PLAYFIELD   = 1300        # Game over boundary
+PLAYFIELD   = 800        # Game over boundary
 FPS         = 50
-ZOOM        = 1          # Camera zoom
+ZOOM        = 3          # Camera zoom
 ZOOM_FOLLOW = False      # Set to False for fixed view (don't use zoom)
+SCALE       = 1.0
 
-LANE_WIDTH = 25
+LANE_WIDTH = 12
 LANE_SEP = 1
-EDGE_WIDTH = 150
+EDGE_WIDTH = 100
+TRAFFIC_LIGHT_R = LANE_WIDTH//3
+TRAFFIC_LIGHT_R2 = LANE_WIDTH//4
 
+ConvertRGB = lambda x: map(lambda y: y/255.0, x)
+TRAFFIC_LIGHT_OUTER_COLOR = ConvertRGB((80, 126, 27))
+TRAFFIC_LIGHT_INNER_COLOR = ConvertRGB((255, 255, 255))
 ROAD_COLOR = [0.4, 0.4, 0.4]
-LANE_SEP_COLOR = [1, 1, 1]
+LANE_SEP_COLOR = [0.6, 0.6, 0.6]
 
 class FrictionDetector(contactListener):
 
@@ -116,9 +125,11 @@ class CarGridDriving(gym.Env):
 
     def _create_track(self):
         self.off_params = (-WINDOW_H//4, -WINDOW_W//2.5)
-        lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE)
+        lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE,
+            LATTICE_CONSTRAINTS, RANDOM_DELETIONS)
         grid_polygons, ls_polygons = construct_grid(lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
         self.road = []
+        self.ls_polygons = ls_polygons
 
         # draw track
         i = 0
@@ -139,26 +150,21 @@ class CarGridDriving(gym.Env):
         self.lattice = lattice
         self.track = grid_polygons
 
-        # lane separators
-        for polygon in ls_polygons:
-            t = self.world.CreateStaticBody(fixtures = fixtureDef(
-                shape=polygonShape(vertices=list(polygon))
-                ))
-            t.userData = t
-            t.color = LANE_SEP_COLOR[:]
-            t.boxtype = "lane-sep"
-            t.road_friction = 1.0
-            t.fixtures[0].sensor = True
-            self.road_poly.append(( list(polygon), t.color ))
-            self.road.append(t)
-
         # which vertices are in the lattice?
         h, w = GRID_ROWS, GRID_COLS
         self.which_points = []
+        self.neighbors = []
         for i in range(h):
             for j in range(w):
                 if lattice[i, j, 0]:
                     self.which_points += [(i, j)]
+                    self.neighbors += [lattice[i, j, 1:]]
+
+        # construct traffic lights
+        self.lights = []
+        for neighbor in self.neighbors:
+            self.lights += [construct_traffic_lights(neighbor, LANE_WIDTH, TRAFFIC_LIGHT_R, TRAFFIC_LIGHT_R2)]
+
         return True
 
     def reset(self):
@@ -225,7 +231,32 @@ class CarGridDriving(gym.Env):
 
         if "t" not in self.__dict__: return  # reset() not called yet
 
+        # zoom = 0.1*SCALE*max(1-self.t, 0) + ZOOM*SCALE*min(self.t, 1)   # Animate zoom first second
+        # scroll_x = self.car.hull.position[0]
+        # scroll_y = self.car.hull.position[1]
+        # angle = -self.car.hull.angle
+        # vel = self.car.hull.linearVelocity
+        # if np.linalg.norm(vel) > 0.5:
+        #    angle = math.atan2(vel[0], vel[1])
+        # self.transform.set_scale(zoom, zoom)
+        # self.transform.set_translation(
+        #    WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
+        #    WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
+        # self.transform.set_rotation(angle)
         self.transform.set_translation(WINDOW_W/2, WINDOW_H/2)
+
+        # iterate through traffic lights
+        for i, point in enumerate(self.which_points):
+            shift_pos = self.off_params
+            shift_pos = (shift_pos[1]+point[1]*EDGE_WIDTH, shift_pos[0]+point[0]*EDGE_WIDTH)
+            for light in self.lights[i]:
+                light_polygons = light.get_polygons(shift_pos) # should also step
+                #self.viewer.draw_polygon(light_polygons[0], color=TRAFFIC_LIGHT_OUTER_COLOR)
+                self.viewer.draw_polygon(light_polygons[1], color=TRAFFIC_LIGHT_INNER_COLOR)
+
+        # lane separators
+        for polygon in self.ls_polygons:
+            self.viewer.draw_polygon(polygon, color=LANE_SEP_COLOR)
 
         self.car.draw(self.viewer, mode!="state_pixels")
 
@@ -249,8 +280,10 @@ class CarGridDriving(gym.Env):
             for geom in self.viewer.onetime_geoms:
                 geom.render()
             t.disable()
-            self.render_indicators(WINDOW_W, WINDOW_H)  # TODO: find why 2x needed, wtf
+            self.render_indicators(WINDOW_W, WINDOW_H)  # TODO: find why 2x needed
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
+            image_data.save('tmp.png')
+
             arr = np.fromstring(image_data.data, dtype=np.uint8, sep='')
             arr = arr.reshape(VP_H, VP_W, 4)
             arr = arr[::-1, :, 0:3]

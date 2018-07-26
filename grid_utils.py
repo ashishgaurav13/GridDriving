@@ -2,59 +2,136 @@ import sys, math
 import numpy as np
 import random
 from collections import deque
+from copy import deepcopy
 
 # BFS to check graph connectivity
-def BFS(lattice):
+def BFS(lattice, edges=None):
 	h, w = lattice.shape
-	tovisit = None
+	tovisit = deque()
 	for i in range(h):
 		for j in range(w):
 			if lattice[i][j]:
-				tovisit = deque([(0, 0)])
-	if not tovisit: return False # empty graph
+				tovisit.append((i, j))
+				break
+		if len(tovisit) == 1: break
+	if len(tovisit) == 0: return False # empty graph
 	n = np.sum(lattice)
 	visited = set()
+	if edges:
+		print(edges)
 	while len(tovisit) > 0:
 		curr = tovisit.popleft()
 		visited.add(curr)
 		i, j = curr
+		if edges:
+			print(edges)
 		if i-1 >= 0 and (i-1, j) not in visited and lattice[i-1, j]:
-			tovisit.append((i-1, j))
+			if not edges or (edges and ((i-1, j, i, j, 1) in edges or (i, j, i-1, j, 3) in edges)):
+				tovisit.append((i-1, j))
 		if i+1 < h and (i+1, j) not in visited and lattice[i+1, j]:
-			tovisit.append((i+1, j))
+			if not edges or (edges and ((i+1, j, i, j, 3) in edges or (i, j, i+1, j, 1) in edges)):
+				tovisit.append((i+1, j))
 		if j-1 >= 0 and (i, j-1) not in visited and lattice[i, j-1]:
-			tovisit.append((i, j-1))
+			if not edges or (edges and ((i, j-1, i, j, 2) in edges or (i, j, i, j-1, 4) in edges)):
+				tovisit.append((i, j-1))
 		if j+1 < w and (i, j+1) not in visited and lattice[i, j+1]:
-			tovisit.append((i, j+1))
+			if not edges or (edges and ((i, j+1, i, j, 4) in edges or (i, j, i, j+1, 2) in edges)):
+				tovisit.append((i, j+1))
 	return len(visited) == n
 
 # Lattice is a set of h x w points, randomly set or unset. We also 
 # encode neighbor information. Overall the dimensionality is
 # h x w x 5, where (i, j, 0) denotes value of point (i, j). while
 # (i, j, 1:4) denote values of neighbors going top, right, bottom, left.
-def construct_lattice(h, w, p):
+#
+# Lattice constraints have min max values for 5 types of junctions.
+#
+# After constructing the lattice, do random deletions until those conditions are met.
+def construct_lattice(h, w, p, lattice_constraints, num_deletions):
 	lattice = np.zeros(shape=(h, w, 5), dtype=bool)
-	is_connected = False
-	while not is_connected:
+	counts_loop = 0
+	while True:
+		counts_loop += 1
 		for i in range(h):
 			for j in range(w):
 				lattice[i][j][0] = bool(np.random.choice(2, 1, p=[1-p, p])[0])
 		is_connected = BFS(lattice[:, :, 0])
+		if not is_connected: continue
+		edges = []
+		for i in range(h):
+			for j in range(w):
+				# update bottom neighbor
+				if i-1 >= 0:
+					lattice[i-1][j][1] = lattice[i][j][0]
+					if (i, j, i-1, j, 3) not in edges: edges.append((i-1, j, i, j, 1))
+				# update right neighbor
+				if j+1 < w:
+					lattice[i][j+1][4] = lattice[i][j][0]
+					if (i, j, i, j+1, 2) not in edges: edges.append((i, j+1, i, j, 4))
+				# update top neighbor
+				if i+1 < h:
+					lattice[i+1][j][3] = lattice[i][j][0]
+					if (i, j, i+1, j, 1) not in edges: edges.append((i+1, j, i, j, 3))
+				# update left neighbor
+				if j-1 >= 0:
+					lattice[i][j-1][2] = lattice[i][j][0]
+					if (i, j, i, j-1, 4) not in edges: edges.append((i, j-1, i, j, 2))
+		# check constraints before random deletions
+		is_satisfied = check_constraints(lattice, lattice_constraints)
+		if not is_satisfied: continue
+		# random deletions; it is possible to loop forever if the graph cannot satisfy lattice
+		# constraints ever, after deleting the required number of edges
+		lattice, success = do_random_deletions(lattice, np.array(edges), num_deletions, lattice_constraints)
+		if not success: continue
+		else: break
+	print('Took %d iterations to generate track' % counts_loop)
+	return lattice
+
+# Do random deletions, given number of deletions
+# Ensure that connectedness holds
+# Deletions are done by choosing a random subset of the edges and deleting those
+def do_random_deletions(lattice, edges_orig, n, constraints, max_tries=1000):
+	num_tries = 0
+	while num_tries < max_tries:
+		new_lattice = deepcopy(lattice)
+		edges = deepcopy(edges_orig)
+		edges_to_delete = edges[np.random.choice(len(edges), n, replace=False)]
+		for (a, b, c, d, _) in edges_to_delete:
+			if a+1 == c: ntype, otype = 1, 3
+			if b-1 == d: ntype, otype = 4, 2
+			if a-1 == c: ntype, otype = 3, 1
+			if b+1 == d: ntype, otype = 2, 4
+			new_lattice[a][b][ntype] = False
+			new_lattice[c][d][otype] = False
+		new_edges = []
+		edges = list(edges)
+		for edge in edges:
+			if edge not in edges_to_delete:
+				new_edges.append(edge)
+		edges = new_edges
+		num_tries += 1
+		is_connected = BFS(new_lattice[:, :, 0], edges=edges)
+		if not is_connected: continue
+		is_satisfied = check_constraints(new_lattice, constraints)
+		if not is_satisfied: continue
+		else: 
+			print('Took %d inner iterations for random deletions' % num_tries)
+			return new_lattice, True
+	print('Took %d inner iterations for random deletions' % num_tries)
+	return lattice, False
+
+# Check constraints on the degree of nodes in a lattice
+def check_constraints(lattice, lattice_constraints):
+	h, w = lattice.shape[:2]
+	# count neighbors
+	nc = []
 	for i in range(h):
 		for j in range(w):
-			# update bottom neighbor
-			if i-1 >= 0:
-				lattice[i-1][j][1] = lattice[i][j][0]
-			# update right neighbor
-			if j+1 < w:
-				lattice[i][j+1][4] = lattice[i][j][0]
-			# update top neighbor
-			if i+1 < h:
-				lattice[i+1][j][3] = lattice[i][j][0]
-			# update left neighbor
-			if j-1 >= 0:
-				lattice[i][j-1][2] = lattice[i][j][0]
-	return lattice
+			if lattice[i, j, 0]:
+				nc.append(sum(lattice[i, j, 1:]))
+	satisfied = [lattice_constraints[i][0] <= nc.count(i) <= lattice_constraints[i][1] for i in range(5)]
+	is_satisfied = sum(satisfied) == 5
+	return is_satisfied
 
 # Create lanes for each edge from this point, leaving 2*lane_w
 # on each side; d is the half edge
@@ -62,13 +139,13 @@ def generate_lane_sep(pt_info, lane_w, d, lane_sep):
 	lane_polygons = []
 	if pt_info[0]:
 		if pt_info[1]:
-			lane_polygons += rect(-lane_sep, lane_sep, 2*lane_w, d)
+			lane_polygons += rect(-lane_sep, lane_sep, 2*lane_w, d, 2, 2)
 		if pt_info[2]:
-			lane_polygons += rect(2*lane_w, d, -lane_sep, lane_sep)
+			lane_polygons += rect(2*lane_w, d, -lane_sep, lane_sep, 2, 2)
 		if pt_info[3]:
-			lane_polygons += rect(-lane_sep, lane_sep, -d, -2*lane_w)
+			lane_polygons += rect(-lane_sep, lane_sep, -d, -2*lane_w, 2, 2)
 		if pt_info[4]:
-			lane_polygons += rect(-d, -2*lane_w, -lane_sep, lane_sep)
+			lane_polygons += rect(-d, -2*lane_w, -lane_sep, lane_sep, 2, 2)
 	return lane_polygons
 
 # given center (cx, cy) and radius r, find a set of points
@@ -83,8 +160,15 @@ def arc_points(A, B, cx, cy, r, num_points):
 		pts.append((cx+r*math.cos(A+step*div), cy+r*math.sin(A+step*div)))
 	return pts
 
-def translate(pt, xs, ys):
-	return (pt[0]+xs, pt[1]+ys)
+# translate to some place after rotating by angle degrees
+def translate(pt, xs, ys, angle=0):
+	pt = (
+		xs+math.cos(angle*math.pi/180.0)*pt[0]-math.sin(angle*math.pi/180.0)*pt[1],
+		ys+math.sin(angle*math.pi/180.0)*pt[0]+math.cos(angle*math.pi/180.0)*pt[1]
+	)
+	return pt
+
+def rotate(pt, angle): return 
 
 def rect(x1, x2, y1, y2, xpoints=2, ypoints=2):
 	rects = []
@@ -224,41 +308,6 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 				si += 1
 	return polygons
 
-# shape is a circle and a triangle within
-# 4 states: straight, left, right, stop
-# types: slr, lr, sr, sl
-class TrafficLight:
-	# pos = how much to translate
-	# state cycle defines transition, happens every 3 sec
-	def __init__(self, pos, state_cycle, lane_w, limit=100):
-		self.state_cycle = state_cycle
-		self.state_idx = 0
-		self.limit = limit
-		self.idx = 0
-		self.circle = arc_points(0, 330, 0, 0, lane_w//4, num_points=12)
-		self.circle = [translate(pt, *pos) for pt in self.circle]
-		# any sign is 0.05lw away from edge
-		# diag of rect is 0.25lw*2-0.05lw*2=0.40lw /2=> 0.20lw /sqrt2=>0.1414lw
-		half_side = int(0.1414*lane_w)
-		self.rect = rect(-half_side, half_side, -half_side, half_side)
-		self.rect = [translate(pt, *pos) for pt in self.rect]
-		self.right = arc_points(0, 240, 0, 0, lane_w//5, num_points=3)
-		self.right += [self.right[-1]]
-		self.right = [translate(pt, *pos) for pt in self.right]
-		self.straight = arc_points(90, 330, 0, 0, lane_w//5, num_points=3)
-		self.straight += [self.straight[-1]]
-		self.straight = [translate(pt, *pos) for pt in self.straight]
-		self.left = arc_points(60, 300, 0, 0, lane_w//5, num_points=3)
-		self.left += [self.left[-1]]
-		self.left = [translate(pt, *pos) for pt in self.left]
-
-	def get_poly():
-		curr_state = self.state_cycle[self.state_idx]
-		if curr_state == "stop":
-			to_return = self.rect
-		elif curr_state == "straight":
-
-
 # Given 5 values for a point (1 for itself and 4 for neighbors)
 # construct polygons needed to draw this out; Lane width is lane_w
 # and from this point draw only until distance d (half edge)
@@ -397,3 +446,67 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 				all_polygons += polygons
 				lane_sep_polygons += ls_polygons
 	return all_polygons, lane_sep_polygons
+
+# shape is a circle and a triangle within
+# 4 states: straight, left, right, stop
+class TrafficLight:
+	# pos = how much to translate
+	# state cycle defines transition, happens every limit number of steps
+	# also needs initial pos, rotation
+	# r is the outer circle radius, r2 is the max dimension of inner thing
+	def __init__(self, state_cycle, r, r2, pos, rot=0, limit=300):
+		self.state_cycle = state_cycle
+		self.state_idx = 0
+		self.limit = limit
+		self.idx = 0
+		self.circle = arc_points(0, 330, 0, 0, r, num_points=12)
+		half_side = int(r2/(math.sqrt(2)))
+		self.stop = rect(-half_side, half_side, -half_side, half_side, 2, 2)[0]
+		self.right = arc_points(0, 240, 0, 0, r2, num_points=3)
+		self.right += [self.right[-1]]
+		self.straight = arc_points(90, 330, 0, 0, r2, num_points=3)
+		self.straight += [self.straight[-1]]
+		self.left = arc_points(60, 300, 0, 0, r2, num_points=3)
+		self.left += [self.left[-1]]
+		self.pos = pos
+		self.rot = rot
+
+	def get_polygons(self, shift_pos):
+		curr_state = self.state_cycle[self.state_idx]
+		self.idx = (self.idx+1)%self.limit
+		if self.idx == 0:
+			self.state_idx = (self.state_idx+1)%len(self.state_cycle)
+		to_return = [self.circle, eval('self.%s' % curr_state)]
+		to_return = [[translate(pt, *self.pos, angle=self.rot) for pt in polygon] for polygon in to_return]
+		to_return = [[translate(pt, *shift_pos) for pt in polygon] for polygon in to_return]
+		to_return = map(make_counter_clockwise, to_return)
+		return to_return
+
+# given neighbor information, construct traffic light objects around (0, 0)
+def construct_traffic_lights(neighbors, lane_w, r, r2):
+	lights = []
+	shorthand = {'s': "straight", 'l': "left", 'r': "right", 'n': "stop"}
+	create_lights_cycle = lambda s: map(lambda k: shorthand[k], list(s))
+	if list(neighbors) == [True, True, True, True]:
+		lights.append(TrafficLight(create_lights_cycle("srlnnnnn"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("nnnnsrnl"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("srnlnnnn"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("nnnnsrln"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+	elif list(neighbors) == [False, True, True, True]:
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
+	elif list(neighbors) == [True, False, True, True]:
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+	elif list(neighbors) == [True, True, False, True]:
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
+	elif list(neighbors) == [True, True, True, False]:
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
+	return lights
+
