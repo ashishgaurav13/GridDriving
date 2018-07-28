@@ -13,6 +13,7 @@ from car_dynamics import Car
 from gym.utils import colorize
 from grid_utils import *
 from env_utils import *
+from localization import *
 
 import pyglet
 from pyglet import gl
@@ -75,6 +76,12 @@ class CarGridDriving(gym.Env):
         self.viewers = [None for i in range(NUM_VEHICLES)]
         self.cars = [None for i in range(NUM_VEHICLES)]
 
+        # Store tile direction for whatever tile was contacted last
+        self.last_tile_direction = [None for i in range(NUM_VEHICLES)]
+
+        # Hold localization strings
+        self.loc = ["?" for i in range(NUM_VEHICLES)]
+
         # Holds all static bodies that make up the road, doesn't
         # include lane separators or traffic lights, just the
         # gray pieces
@@ -116,8 +123,9 @@ class CarGridDriving(gym.Env):
             LATTICE_CONSTRAINTS, RANDOM_DELETIONS)
 
         # Create polygons for the lattice road pieces and lane separators
-        self.track, self.ls_polygons = construct_grid(self.lattice, LANE_WIDTH,
-            EDGE_WIDTH, self.off_params, LANE_SEP)
+        # Also store directions for each of the road piece
+        self.track, self.ls_polygons, self.directions = construct_grid(self.lattice,
+            LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
 
         # Start with a blank list of road objects
         self.road = []
@@ -131,6 +139,9 @@ class CarGridDriving(gym.Env):
                 shape=polygonShape(vertices=list(polygon))
                 ))
             t.userData = t
+
+            # Assign direction
+            t.direction = self.directions[i]
 
             # Assign colors
             c = 0.01*(i%3)
@@ -212,8 +223,54 @@ class CarGridDriving(gym.Env):
         # Step the world
         self.world.Step(1.0/FPS, 6*30, 2*30)
         
-        # Step transition time for zoom
-
+        # Regenerate localization info
+        min_speed = 2
+        for car_idx in range(NUM_VEHICLES):
+            on_road, pid = self.determine_onroad(car_idx)
+            if on_road:
+                self.last_tile_direction[car_idx] = self.directions[pid]
+            else:
+                self.loc[car_idx] = "off-road"
+                continue
+            if self.last_tile_direction[car_idx] == None:
+                continue
+            vx, vy = self.cars[car_idx].hull.linearVelocity
+            # What is the right direction
+            right_dir = self.last_tile_direction[car_idx]
+            if right_dir == "l":
+                if vx < -min_speed:
+                    self.loc[car_idx] = "right"
+                elif vx > min_speed:
+                    self.loc[car_idx] = "left"
+                else:
+                    self.loc[car_idx] = "?"
+            elif right_dir == "r":
+                if vx > min_speed:
+                    self.loc[car_idx] = "right"
+                elif vx < -min_speed:
+                    self.loc[car_idx] = "left"
+                else:
+                    self.loc[car_idx] = "?"
+            elif right_dir == "t":
+                if vy > min_speed:
+                    self.loc[car_idx] = "right"
+                elif vy < -min_speed:
+                    self.loc[car_idx] = "left"
+                else:
+                    self.loc[car_idx] = "?"
+            elif right_dir == "b":
+                if vy < -min_speed:
+                    self.loc[car_idx] = "right"
+                elif vy > min_speed:
+                    self.loc[car_idx] = "left"
+                else:
+                    self.loc[car_idx] = "?"
+            elif right_dir == "n":
+                # TODO: Assuming there are no 1-edge junctions
+                self.loc[car_idx] = "junction"
+            else:
+                self.loc[car_idx] = "?"
+        
         # render images for each car, through their own viewer
         self.states = []
         for car_idx in range(NUM_VEHICLES):
@@ -244,6 +301,11 @@ class CarGridDriving(gym.Env):
 
         return self.states, step_rewards, done_values, {}
 
+    # Determine if the car is offroad or onroad
+    def determine_onroad(self, car_idx):
+        return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
+            self.cars[car_idx].hull.position)
+
     def render(self, car_idx, mode='human'):
 
         # Make the transforms and score labels if needed
@@ -255,7 +317,7 @@ class CarGridDriving(gym.Env):
         # Construct a viewer for this car with score label and transform object
         if self.viewers[car_idx] is None:
             self.viewers[car_idx] = rendering.Viewer(WINDOW_W, WINDOW_H)
-            self.score_labels[car_idx] = pyglet.text.Label('0000', font_size=18,
+            self.score_labels[car_idx] = pyglet.text.Label('0000, ?', font_size=18,
             x=10, y=30,
             anchor_x='left', anchor_y='center',
             color=(255,255,255,255))
@@ -408,7 +470,7 @@ class CarGridDriving(gym.Env):
         horiz_ind(20, -10.0*self.cars[car_idx].wheels[0].joint.angle, (0,1,0))
         horiz_ind(30, -0.8*self.cars[car_idx].hull.angularVelocity, (1,0,0))
         gl.glEnd()
-        self.score_labels[car_idx].text = "%04i" % self.rewards[car_idx]
+        self.score_labels[car_idx].text = "%04i, %s" % (self.rewards[car_idx], self.loc[car_idx])
         self.score_labels[car_idx].draw()
 
 if __name__=="__main__":

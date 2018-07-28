@@ -310,23 +310,29 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 def construct_polygons(point_info, lane_w, d):
 	neighbors = list(point_info[1:5])
 	polygons = []
+	# For each rectangle provide which direction is considered as
+	# going right
 	if sum(neighbors) == 1:
 		if neighbors == [False, False, False, True]:
 			polygons += rect(-d, 0, 0, lane_w)
 			polygons += rect(-d, 0, -lane_w, 0)
 			polygons += outer_arc(0, 0, lane_w, -90, 90, num_points=5)
+			direction = "lrnnnn"
 		elif neighbors == [False, False, True, False]:
 			polygons += rect(-lane_w, 0, -d, 0)
 			polygons += rect(0, lane_w, -d, 0)
 			polygons += outer_arc(0, 0, lane_w, 0, 180, num_points=5)
+			direction = "btnnnn"
 		elif neighbors == [False, True, False, False]:
 			polygons += rect(0, d, 0, lane_w)
 			polygons += rect(0, d, -lane_w, 0)
 			polygons += outer_arc(0, 0, lane_w, 90, 270, num_points=5)
+			direction = "lrnnnn"
 		elif neighbors == [True, False, False, False]:
 			polygons += rect(-lane_w, 0, 0, d)
 			polygons += rect(0, lane_w, 0, d)
 			polygons += outer_arc(0, 0, lane_w, -180, 0, num_points=5)
+			direction = "btnnnn"
 	elif sum(neighbors) == 2:
 		if neighbors == [False, False, True, True]:
 			polygons += rect(-d, 0, 0, lane_w)
@@ -335,9 +341,11 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-lane_w, 0, -d, -2*lane_w)
 			polygons += inner_arc(-2*lane_w, 0, -2*lane_w, 0, -2*lane_w, -2*lane_w, lane_w, 0, 90, num_points=3)
 			polygons += rect(-d, -2*lane_w, -lane_w, 0)
+			direction = "lnntbnnr"
 		elif neighbors == [False, True, False, True]:
 			polygons += rect(-d, d, 0, lane_w)
 			polygons += rect(-d, d, -lane_w, 0)
+			direction = "lr"
 		elif neighbors == [True, True, False, False]:
 			polygons += rect(-lane_w, 0, 0, d)
 			polygons += outer_arc(0, 0, lane_w, 180, 270, num_points=3)
@@ -345,6 +353,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(2*lane_w, d, 0, lane_w)
 			polygons += inner_arc(0, 2*lane_w, 0, 2*lane_w, 2*lane_w, 2*lane_w, lane_w, 180, 270, num_points=3)
 			polygons += rect(0, lane_w, 2*lane_w, d)
+			direction = "bnnrlnnt"
 		elif neighbors == [False, True, True, False]:
 			polygons += rect(-lane_w, 0, -d, 0)
 			polygons += outer_arc(0, 0, lane_w, 90, 180, num_points=3)
@@ -352,9 +361,11 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(2*lane_w, d, -lane_w, 0)
 			polygons += inner_arc(0, 2*lane_w, -2*lane_w, 0, 2*lane_w, -2*lane_w, lane_w, 90, 180, num_points=3)
 			polygons += rect(0, lane_w, -d, -2*lane_w)
+			direction = "bnnlrnnt"
 		elif neighbors == [True, False, True, False]:
 			polygons += rect(-lane_w, 0, -d, d)
 			polygons += rect(0, lane_w, -d, d)
+			direction = "bt"
 		elif neighbors == [True, False, False, True]:
 			polygons += rect(0, lane_w, 0, d)
 			polygons += outer_arc(0, 0, lane_w, -90, 0, num_points=3)
@@ -362,6 +373,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
 			polygons += inner_arc(-2*lane_w, 0, 0, 2*lane_w, -2*lane_w, 2*lane_w, lane_w, -90, 0, num_points=3)
 			polygons += rect(-lane_w, 0, 2*lane_w, d)
+			direction = "tnnrlnnb"
 	elif sum(neighbors) == 3:
 		if neighbors == [False, True, True, True]:
 			polygons += rect(-d, d, 0, lane_w)
@@ -371,6 +383,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(2*lane_w, d, -lane_w, 0)
 			polygons += inner_arc(0, 2*lane_w, -2*lane_w, 0, 2*lane_w, -2*lane_w, lane_w, 90, 180, num_points=3)
 			polygons += rect(0, lane_w, -d, -2*lane_w)
+			direction = "lbnnrrnnt"
 		elif neighbors == [True, False, True, True]:
 			polygons += rect(0, lane_w, -d, d)
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
@@ -379,6 +392,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-lane_w, 0, -d, -2*lane_w)
 			polygons += inner_arc(-2*lane_w, 0, -2*lane_w, 0, -2*lane_w, -2*lane_w, lane_w, 0, 90, num_points=3)
 			polygons += rect(-d, -2*lane_w, -lane_w, 0)
+			direction = "tlnnbbnnr"
 		elif neighbors == [True, True, False, True]:
 			polygons += rect(-d, d, -lane_w, 0)
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
@@ -387,6 +401,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(2*lane_w, d, 0, lane_w)
 			polygons += inner_arc(0, 2*lane_w, 0, 2*lane_w, 2*lane_w, 2*lane_w, lane_w, 180, 270, num_points=3)
 			polygons += rect(0, lane_w, 2*lane_w, d)
+			direction = "rlnnbrnnt"
 		elif neighbors == [True, True, True, False]:
 			polygons += rect(-lane_w, 0, -d, d)
 			polygons += rect(2*lane_w, d, 0, lane_w)
@@ -395,6 +410,7 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(2*lane_w, d, -lane_w, 0)
 			polygons += inner_arc(0, 2*lane_w, -2*lane_w, 0, 2*lane_w, -2*lane_w, lane_w, 90, 180, num_points=3)
 			polygons += rect(0, lane_w, -d, -2*lane_w)
+			direction = "blnntrnnt"
 	elif sum(neighbors) == 4:
 		if neighbors == [True, True, True, True]:
 			polygons += rect(-lane_w, 0, -d, -2*lane_w)
@@ -409,7 +425,8 @@ def construct_polygons(point_info, lane_w, d):
 			polygons += rect(-d, -2*lane_w, 0, lane_w)
 			polygons += inner_arc(-2*lane_w, 0, 0, 2*lane_w, -2*lane_w, 2*lane_w, lane_w, -90, 0, num_points=3)
 			polygons += rect(-lane_w, 0, 2*lane_w, d)
-	return polygons
+			direction = "bnnrlnntrnntlnnb"
+	return polygons, direction
 
 # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
 def make_counter_clockwise(polygon):
@@ -425,11 +442,13 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 	h_off, w_off = off_params
 	all_polygons = []
 	lane_sep_polygons = []
+	directions = ""
 	for i in range(h):
 		for j in range(w):
 			if lattice[i][j][0]:
 				curr_y, curr_x = i*edge_length, j*edge_length
-				polygons = construct_polygons(lattice[i, j], lane_w, edge_length/2)
+				polygons, direction = construct_polygons(lattice[i, j], lane_w, edge_length/2)
+				directions += direction
 				polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in polygons]
 				polygons = map(make_counter_clockwise, polygons)
 				polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in polygons]
@@ -441,7 +460,7 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 				# Inversion should not be needed
 				all_polygons += polygons
 				lane_sep_polygons += ls_polygons
-	return all_polygons, lane_sep_polygons
+	return all_polygons, lane_sep_polygons, directions
 
 # shape is a circle and a triangle within
 # 4 states: straight, left, right, stop
