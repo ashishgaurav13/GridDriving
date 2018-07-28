@@ -443,12 +443,14 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 	all_polygons = []
 	lane_sep_polygons = []
 	directions = ""
+	relevant_nodes = []
 	for i in range(h):
 		for j in range(w):
 			if lattice[i][j][0]:
 				curr_y, curr_x = i*edge_length, j*edge_length
 				polygons, direction = construct_polygons(lattice[i, j], lane_w, edge_length/2)
 				directions += direction
+				relevant_nodes += [(i, j),]*len(direction)
 				polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in polygons]
 				polygons = map(make_counter_clockwise, polygons)
 				polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in polygons]
@@ -460,7 +462,7 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 				# Inversion should not be needed
 				all_polygons += polygons
 				lane_sep_polygons += ls_polygons
-	return all_polygons, lane_sep_polygons, directions
+	return all_polygons, lane_sep_polygons, directions, relevant_nodes
 
 # shape is a circle and a triangle within
 # 4 states: straight, left, right, stop
@@ -497,31 +499,34 @@ class TrafficLight:
 		to_return = map(make_counter_clockwise, to_return)
 		return to_return
 
+	def shifted_pos(self, shift_pos):
+		return translate(self.pos, *shift_pos)
+
 # given neighbor information, construct traffic light objects around (0, 0)
 def construct_traffic_lights(neighbors, lane_w, r, r2):
 	lights = []
 	shorthand = {'s': "straight", 'l': "left", 'r': "right", 'n': "stop"}
 	create_lights_cycle = lambda s: map(lambda k: shorthand[k], list(s))
 	if list(neighbors) == [True, True, True, True]:
-		lights.append(TrafficLight(create_lights_cycle("srlnnnnn"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
-		lights.append(TrafficLight(create_lights_cycle("nnnnsrnl"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
-		lights.append(TrafficLight(create_lights_cycle("srnlnnnn"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
-		lights.append(TrafficLight(create_lights_cycle("nnnnsrln"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("srlnnnnn"), r, r2, (lane_w*2.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("nnnnsrnl"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("srnlnnnn"), r, r2, (lane_w*-2.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("nnnnsrln"), r, r2, (lane_w*-0.5, lane_w*2.5), 180))
 	elif list(neighbors) == [False, True, True, True]:
-		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
-		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
-		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*2.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-2.5, lane_w*-0.5), -90))
 	elif list(neighbors) == [True, False, True, True]:
-		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
-		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
-		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-2.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*-0.5, lane_w*2.5), 180))
 	elif list(neighbors) == [True, True, False, True]:
-		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-1.5, lane_w*-0.5), -90))
-		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
-		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-2.5, lane_w*-0.5), -90))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*-0.5, lane_w*2.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*2.5, lane_w*0.5), 90))
 	elif list(neighbors) == [True, True, True, False]:
-		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-0.5, lane_w*1.5), 180))
-		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*1.5, lane_w*0.5), 90))
-		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*0.5, lane_w*-1.5), 0))
+		lights.append(TrafficLight(create_lights_cycle("ssnl"), r, r2, (lane_w*-0.5, lane_w*2.5), 180))
+		lights.append(TrafficLight(create_lights_cycle("nrlr"), r, r2, (lane_w*2.5, lane_w*0.5), 90))
+		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
 	return lights
 

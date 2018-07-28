@@ -23,14 +23,14 @@ from pyglet import gl
 # Modified by Ashish Gaurav.
 
 STATE_W, STATE_H = 256, 256
-VIDEO_W, VIDEO_H = 900, 500
+VIDEO_W, VIDEO_H = 700, 700
 # Comment this out if you're not testing
 # Also uncomment the transform part
-# WINDOW_W, WINDOW_H = VIDEO_W, VIDEO_H
-WINDOW_W, WINDOW_H = 512, 512
-GRID_COLS, GRID_ROWS = 8, 4
+WINDOW_W, WINDOW_H = VIDEO_W, VIDEO_H
+# WINDOW_W, WINDOW_H = 512, 512
+GRID_COLS, GRID_ROWS = 4, 4
 PROB_EDGE = 0.75
-RANDOM_DELETIONS = 12
+RANDOM_DELETIONS = 6
 LATTICE_CONSTRAINTS = [(0, 0), (0, 0), (0, np.inf), (2, np.inf), (2, np.inf)]
 
 PLAYFIELD   = 800        # Game over boundary
@@ -41,7 +41,7 @@ SCALE       = 1.0
 
 LANE_WIDTH = 12
 LANE_SEP = 1
-EDGE_WIDTH = 100
+EDGE_WIDTH = 150
 TRAFFIC_LIGHT_R = LANE_WIDTH//3
 TRAFFIC_LIGHT_R2 = LANE_WIDTH//4
 
@@ -76,8 +76,10 @@ class CarGridDriving(gym.Env):
         self.viewers = [None for i in range(NUM_VEHICLES)]
         self.cars = [None for i in range(NUM_VEHICLES)]
 
-        # Store tile direction for whatever tile was contacted last
+        # Store tile direction, pid and relevant node for whatever tile was contacted last
         self.last_tile_direction = [None for i in range(NUM_VEHICLES)]
+        self.last_pid = [None for i in range(NUM_VEHICLES)]
+        self.last_relevant_node = [None for i in range(NUM_VEHICLES)]
 
         # Hold localization strings
         self.loc = ["?" for i in range(NUM_VEHICLES)]
@@ -124,8 +126,8 @@ class CarGridDriving(gym.Env):
 
         # Create polygons for the lattice road pieces and lane separators
         # Also store directions for each of the road piece
-        self.track, self.ls_polygons, self.directions = construct_grid(self.lattice,
-            LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
+        self.track, self.ls_polygons, self.directions, self.relevant_nodes = \
+            construct_grid(self.lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
 
         # Start with a blank list of road objects
         self.road = []
@@ -227,8 +229,11 @@ class CarGridDriving(gym.Env):
         min_speed = 2
         for car_idx in range(NUM_VEHICLES):
             on_road, pid = self.determine_onroad(car_idx)
+            self.last_pid[car_idx] = pid
             if on_road:
                 self.last_tile_direction[car_idx] = self.directions[pid]
+                # Also update last relevant node
+                self.last_relevant_node[car_idx] = self.relevant_nodes[pid]
             else:
                 self.loc[car_idx] = "off-road"
                 continue
@@ -326,44 +331,63 @@ class CarGridDriving(gym.Env):
         if "t" not in self.__dict__: return  # reset() not called yet
 
         # Create zoom effect and car following for this specific car
-        zoom = 0.1*SCALE*max(1-self.t[car_idx], 0) + ZOOM*SCALE*min(self.t[car_idx], 1)   # Animate zoom first second
-        scroll_x = self.cars[car_idx].hull.position[0]
-        scroll_y = self.cars[car_idx].hull.position[1]
-        angle = -self.cars[car_idx].hull.angle
-        vel = self.cars[car_idx].hull.linearVelocity
-        if np.linalg.norm(vel) > 0.5:
-           angle = math.atan2(vel[0], vel[1])
-        self.transforms[car_idx].set_scale(zoom, zoom)
-        self.transforms[car_idx].set_translation(
-           WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
-           WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
-        self.transforms[car_idx].set_rotation(angle)
+        # zoom = 0.1*SCALE*max(1-self.t[car_idx], 0) + ZOOM*SCALE*min(self.t[car_idx], 1)   # Animate zoom first second
+        # scroll_x = self.cars[car_idx].hull.position[0]
+        # scroll_y = self.cars[car_idx].hull.position[1]
+        # angle = -self.cars[car_idx].hull.angle
+        # vel = self.cars[car_idx].hull.linearVelocity
+        # if np.linalg.norm(vel) > 0.5:
+        #    angle = math.atan2(vel[0], vel[1])
+        # self.transforms[car_idx].set_scale(zoom, zoom)
+        # self.transforms[car_idx].set_translation(
+        #    WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
+        #    WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
+        # self.transforms[car_idx].set_rotation(angle)
 
         # Comment out the block above and uncomment below if you want to see whole map
         # Also do the changes at the beginning of the file
-        ## self.transforms[car_idx].set_translation(WINDOW_W/2, WINDOW_H/2)
+        self.transforms[car_idx].set_translation(WINDOW_W/2, WINDOW_H/2)
 
         # Iterate through traffic lights
-        # TODO: Should reduce these to bare minimum possible
-        for i, point in enumerate(self.which_points):
-            shift_pos = self.off_params
-            shift_pos = (shift_pos[1]+point[1]*EDGE_WIDTH, shift_pos[0]+point[0]*EDGE_WIDTH)
-            for light in self.lights[i]:
+        # We only want to show the relevant traffic lights
+        # 1. Find out which node in the lattice is relevant
+        # 2. Find out traffic lights in current rectangle (if we have r/l lane classification)
+        # 3. Show just that
+        if self.last_pid[car_idx] != -1:
+            relevant_node = self.last_relevant_node[car_idx]
+            classification_val = self.loc[car_idx] == "right"
+            if classification_val:
+                shift_pos = self.off_params
+                shift_pos = (
+                    shift_pos[1]+relevant_node[1]*EDGE_WIDTH,
+                    shift_pos[0]+relevant_node[0]*EDGE_WIDTH
+                )
+                i = -1
+                if relevant_node in self.which_points:
+                    i = self.which_points.index(relevant_node)
+                if i != -1:
+                    for light in self.lights[i]:
 
-                light_polygons = light.get_polygons(shift_pos) # should also step
+                        light_polygons = light.get_polygons(shift_pos) # should also step
 
-                # Uncomment if you want a circle outside traffic light
-                ## self.viewer.draw_polygon(light_polygons[0], color=TRAFFIC_LIGHT_OUTER_COLOR)
+                        traffic_light_pos = Point(light.shifted_pos(shift_pos))
+                        our_polygon = Polygon(self.road_poly[self.last_pid[car_idx]][0])
+                        # print(light.pos, self.road_poly[self.last_pid[car_idx]][0])
+                        if not our_polygon.contains(traffic_light_pos):
+                            continue
+                        # Uncomment if you want a circle outside traffic light
+                        ## self.viewer.draw_polygon(light_polygons[0], color=TRAFFIC_LIGHT_OUTER_COLOR)
 
-                # Draw triangles for directions or square box for stop
-                self.viewers[car_idx].draw_polygon(light_polygons[1], color=TRAFFIC_LIGHT_INNER_COLOR)
+                        # Draw triangles for directions or square box for stop
+                        self.viewers[car_idx].draw_polygon(light_polygons[1], color=TRAFFIC_LIGHT_INNER_COLOR)
 
         # Lane separators
         for polygon in self.ls_polygons:
             self.viewers[car_idx].draw_polygon(polygon, color=LANE_SEP_COLOR)
 
-        # Draw the car on the viewer
-        self.cars[car_idx].draw(self.viewers[car_idx], mode!="state_pixels")
+        # Draw all cars on the viewer
+        for ci in range(NUM_VEHICLES):
+            self.cars[ci].draw(self.viewers[car_idx], mode!="state_pixels")
 
         # Do the actual rendering using pyglet.gl
         arr = None
