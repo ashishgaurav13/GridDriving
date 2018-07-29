@@ -26,8 +26,8 @@ STATE_W, STATE_H = 256, 256
 VIDEO_W, VIDEO_H = 700, 700
 # Comment this out if you're not testing
 # Also uncomment the transform part
-WINDOW_W, WINDOW_H = VIDEO_W, VIDEO_H
-# WINDOW_W, WINDOW_H = 512, 512
+# WINDOW_W, WINDOW_H = VIDEO_W, VIDEO_H
+WINDOW_W, WINDOW_H = 512, 512
 GRID_COLS, GRID_ROWS = 4, 4
 PROB_EDGE = 0.75
 RANDOM_DELETIONS = 6
@@ -198,15 +198,23 @@ class CarGridDriving(gym.Env):
             print("retry to generate track (normal if there are not many of this messages)")
         
         # randomly init each car
-        car_idx = 0
-        random_choices = np.random.choice(len(self.which_points), NUM_VEHICLES, replace=False)
-        for rid in random_choices:
-            ri, rj = self.which_points[rid]
-            y, x = ri*EDGE_WIDTH, rj*EDGE_WIDTH
-            x, y = translate((x, y), self.off_params[1], self.off_params[0])
-            self.cars[car_idx] = Car(self.world, math.pi, x, y)
-            car_idx += 1
-
+        rect_poly_indices = [i for i in range(len(self.directions)) if self.directions[i] in "lrtb"]
+        random_choices = np.random.choice(rect_poly_indices, NUM_VEHICLES, replace=False)
+        for car_idx, rid in enumerate(random_choices):
+            rect_poly = np.array(self.road_poly[rid][0])
+            direction = self.directions[rid]
+            x = np.mean(rect_poly[:, 0])
+            y = np.mean(rect_poly[:, 1])
+            if direction == "r":
+                angle = -90
+            elif direction == "t":
+                angle = 0
+            elif direction == "l":
+                angle = 90
+            else:
+                angle = 180
+            self.cars[car_idx] = Car(self.world, angle*math.pi/180.0, x, y)
+            
         # return states after init
         return self.step([None for i in range(NUM_VEHICLES)])[0]
 
@@ -247,34 +255,24 @@ class CarGridDriving(gym.Env):
                     self.loc[car_idx] = "right"
                 elif vx > min_speed:
                     self.loc[car_idx] = "left"
-                else:
-                    self.loc[car_idx] = "?"
             elif right_dir == "r":
                 if vx > min_speed:
                     self.loc[car_idx] = "right"
                 elif vx < -min_speed:
                     self.loc[car_idx] = "left"
-                else:
-                    self.loc[car_idx] = "?"
             elif right_dir == "t":
                 if vy > min_speed:
                     self.loc[car_idx] = "right"
                 elif vy < -min_speed:
                     self.loc[car_idx] = "left"
-                else:
-                    self.loc[car_idx] = "?"
             elif right_dir == "b":
                 if vy < -min_speed:
                     self.loc[car_idx] = "right"
                 elif vy > min_speed:
                     self.loc[car_idx] = "left"
-                else:
-                    self.loc[car_idx] = "?"
             elif right_dir == "n":
                 # TODO: Assuming there are no 1-edge junctions
                 self.loc[car_idx] = "junction"
-            else:
-                self.loc[car_idx] = "?"
         
         # render images for each car, through their own viewer
         self.states = []
@@ -331,22 +329,22 @@ class CarGridDriving(gym.Env):
         if "t" not in self.__dict__: return  # reset() not called yet
 
         # Create zoom effect and car following for this specific car
-        # zoom = 0.1*SCALE*max(1-self.t[car_idx], 0) + ZOOM*SCALE*min(self.t[car_idx], 1)   # Animate zoom first second
-        # scroll_x = self.cars[car_idx].hull.position[0]
-        # scroll_y = self.cars[car_idx].hull.position[1]
-        # angle = -self.cars[car_idx].hull.angle
-        # vel = self.cars[car_idx].hull.linearVelocity
-        # if np.linalg.norm(vel) > 0.5:
-        #    angle = math.atan2(vel[0], vel[1])
-        # self.transforms[car_idx].set_scale(zoom, zoom)
-        # self.transforms[car_idx].set_translation(
-        #    WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
-        #    WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
-        # self.transforms[car_idx].set_rotation(angle)
+        zoom = 0.1*SCALE*max(1-self.t[car_idx], 0) + ZOOM*SCALE*min(self.t[car_idx], 1)   # Animate zoom first second
+        scroll_x = self.cars[car_idx].hull.position[0]
+        scroll_y = self.cars[car_idx].hull.position[1]
+        angle = -self.cars[car_idx].hull.angle
+        vel = self.cars[car_idx].hull.linearVelocity
+        if np.linalg.norm(vel) > 0.5:
+           angle = math.atan2(vel[0], vel[1])
+        self.transforms[car_idx].set_scale(zoom, zoom)
+        self.transforms[car_idx].set_translation(
+           WINDOW_W/2 - (scroll_x*zoom*math.cos(angle) - scroll_y*zoom*math.sin(angle)),
+           WINDOW_H/2 - (scroll_x*zoom*math.sin(angle) + scroll_y*zoom*math.cos(angle)) )
+        self.transforms[car_idx].set_rotation(angle)
 
         # Comment out the block above and uncomment below if you want to see whole map
         # Also do the changes at the beginning of the file
-        self.transforms[car_idx].set_translation(WINDOW_W/2, WINDOW_H/2)
+        # self.transforms[car_idx].set_translation(WINDOW_W/2, WINDOW_H/2)
 
         # Iterate through traffic lights
         # We only want to show the relevant traffic lights
