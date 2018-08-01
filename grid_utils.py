@@ -471,7 +471,7 @@ class TrafficLight:
 	# state cycle defines transition, happens every limit number of steps
 	# also needs initial pos, rotation
 	# r is the outer circle radius, r2 is the max dimension of inner thing
-	def __init__(self, state_cycle, r, r2, pos, rot=0, limit=300):
+	def __init__(self, state_cycle, r, r2, pos, rot=0, limit=100):
 		self.state_cycle = state_cycle
 		self.state_idx = 0
 		self.limit = limit
@@ -489,10 +489,10 @@ class TrafficLight:
 		self.rot = rot
 
 	def get_polygons(self, shift_pos):
-		curr_state = self.state_cycle[self.state_idx]
 		self.idx = (self.idx+1)%self.limit
 		if self.idx == 0:
 			self.state_idx = (self.state_idx+1)%len(self.state_cycle)
+		curr_state = self.state_cycle[self.state_idx]
 		to_return = [self.circle, eval('self.%s' % curr_state)]
 		to_return = [[translate(pt, *self.pos, angle=self.rot) for pt in polygon] for polygon in to_return]
 		to_return = [[translate(pt, *shift_pos) for pt in polygon] for polygon in to_return]
