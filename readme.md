@@ -1,5 +1,7 @@
 ## CarGridDriving
 
+<img src="images/circuit.png" width=300/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img src="images/closeup.png" width=300/>
+
 ### Graph Construction
 
 This simulator is an extension of the OpenAI Gym [CarRacing-v0](https://gym.openai.com/envs/CarRacing-v0/) environment. The original environment constructs a heavily morphed circlular track and the goal is to loop around on this track. The simulator used in this project extends this environment by constructing a (h, w) grid, where each edge appears with probability p.
@@ -12,5 +14,15 @@ Finally, once a connected constraint satisfying graph is created, the road polyg
 
 The simulator can be started with n vehicles, and for every step of this environment, each of the vehicles get a viewport capture from their perspective, with only the traffic lights relevant to them showing up in the capture.
 
-<img src="images/circuit.png" style="width:50%"/>
-<img src="images/closeup.png" style="width:30%"/>
+### Features
+- Traffic schedule and rendering support for 3-edge and 4-edge intersections
+- Constraint support for 1-edge, 2-edge, 3-edge, 4-edge intersections
+- Finer polygons can be drawn by changing parameters
+- Generalized to n vehicles, each vehicle viewer only sees relevant information
+- Localization information
+
+### Things to do
+
+- [ ] Update for sparse rewards
+- [ ] Train on options graph
+- [ ] Update documentation in code
