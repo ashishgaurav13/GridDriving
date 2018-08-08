@@ -26,3 +26,7 @@ The simulator can be started with n vehicles, and for every step of this environ
 - [ ] Update for sparse rewards
 - [ ] Train on options graph
 - [ ] Update documentation in code
+
+### License
+
+AGPLv3, check out licenses folder.
