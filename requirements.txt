@@ -1,0 +1,4 @@
+Box2D==2.3.2
+Box2D-kengz==2.3.3
+gym==0.10.5
+shapely==1.6.4
