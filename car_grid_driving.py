@@ -52,7 +52,7 @@ TRAFFIC_LIGHT_R2 = 2*LANE_WIDTH//4
 
 NUM_VEHICLES = 1
 
-ConvertRGB = lambda x: map(lambda y: y/255.0, x)
+ConvertRGB = lambda x: list(map(lambda y: y/255.0, x))
 TRAFFIC_LIGHT_OUTER_COLOR = ConvertRGB((80, 126, 27))
 TRAFFIC_LIGHT_INNER_COLOR = ConvertRGB((255, 255, 255))
 ROAD_COLOR = [0.4, 0.4, 0.4]
@@ -582,7 +582,7 @@ class CarGridDriving(gym.Env):
             self.render_indicators(WINDOW_W, WINDOW_H, car_idx=car_idx)  # TODO: find why 2x needed
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
             # image_data.save('tmp%d.png'%car_idx)
-            arr = np.fromstring(image_data.data, dtype=np.uint8, sep='')
+            arr = np.frombuffer(image_data.data, dtype=np.uint8)
             arr = arr.reshape(VP_H, VP_W, 4)
             arr = arr[::-1, :, 0:3]
             arr = rgb2gray(arr)

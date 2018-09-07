@@ -17,5 +17,5 @@ def determine_road(lattice, edge_length, road_poly, pos):
 	x, y = pos
 
 	# Make sure (x, y) is localizable
-	new_road_poly = map(lambda el: el[0], road_poly)
+	new_road_poly = list(map(lambda el: el[0], road_poly))
 	return on_road(new_road_poly, x, y)

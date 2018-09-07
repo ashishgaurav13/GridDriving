@@ -451,14 +451,14 @@ def construct_grid(lattice, lane_w, edge_length, off_params, lane_sep):
 				polygons, direction = construct_polygons(lattice[i, j], lane_w, edge_length/2)
 				directions += direction
 				relevant_nodes += [(i, j),]*len(direction)
-				polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in polygons]
-				polygons = map(make_counter_clockwise, polygons)
-				polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in polygons]
+				polygons = [list(map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon)) for polygon in polygons]
+				polygons = list(map(make_counter_clockwise, polygons))
+				polygons = [list(map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon)) for polygon in polygons]
 				# Lane separator polygons
 				ls_polygons = generate_lane_sep(lattice[i, j], lane_w, edge_length/2, lane_sep)
-				ls_polygons = [map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon) for polygon in ls_polygons]
-				ls_polygons = map(make_counter_clockwise, ls_polygons)
-				ls_polygons = [map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon) for polygon in ls_polygons]
+				ls_polygons = [list(map(lambda pt: translate(pt, w_off+curr_x, h_off+curr_y), polygon)) for polygon in ls_polygons]
+				ls_polygons = list(map(make_counter_clockwise, ls_polygons))
+				ls_polygons = [list(map(lambda pt: (round(pt[0], 2), round(pt[1], 2)), polygon)) for polygon in ls_polygons]
 				# Inversion should not be needed
 				all_polygons += polygons
 				lane_sep_polygons += ls_polygons
@@ -496,7 +496,7 @@ class TrafficLight:
 		to_return = [self.circle, eval('self.%s' % curr_state)]
 		to_return = [[translate(pt, *self.pos, angle=self.rot) for pt in polygon] for polygon in to_return]
 		to_return = [[translate(pt, *shift_pos) for pt in polygon] for polygon in to_return]
-		to_return = map(make_counter_clockwise, to_return)
+		to_return = list(map(make_counter_clockwise, to_return))
 		return to_return
 
 	def shifted_pos(self, shift_pos):
@@ -506,7 +506,7 @@ class TrafficLight:
 def construct_traffic_lights(neighbors, lane_w, r, r2):
 	lights = []
 	shorthand = {'s': "straight", 'l': "left", 'r': "right", 'n': "stop"}
-	create_lights_cycle = lambda s: map(lambda k: shorthand[k], list(s))
+	create_lights_cycle = lambda s: list(map(lambda k: shorthand[k], list(s)))
 	if list(neighbors) == [True, True, True, True]:
 		lights.append(TrafficLight(create_lights_cycle("srlnnnnn"), r, r2, (lane_w*2.5, lane_w*0.5), 90))
 		lights.append(TrafficLight(create_lights_cycle("nnnnsrnl"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
