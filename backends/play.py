@@ -22,6 +22,9 @@ from ReplayBuffer import ReplayBuffer
 from actor_critic import ActorNetwork, CriticNetwork
 import timeit
 
+import curses
+from curses import wrapper
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -40,10 +43,12 @@ LRC = 0.001     #Lerning rate for Critic
 action_dim = 3  #Steering/Acceleration/Brake
 state_dim = (96, 96, 1)
 
+train_indicator = 1 #1 means Train, 0 means simply Run
+
 class OU(object):
 
     def function(self, x, mu, theta, sigma):
-        print('got %f, mu=%f, theta=%f, sigma=%f' % (x, mu, theta, sigma))
+        # print('got %f, mu=%f, theta=%f, sigma=%f' % (x, mu, theta, sigma))
         return theta * (mu - x) + sigma * np.random.randn(1)
 
 OU = OU()       #Ornstein-Uhlenbeck Process
@@ -155,7 +160,7 @@ class DDPGPolicyNode:
         self.critic = CriticNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRC)
         self.buff = ReplayBuffer(BUFFER_SIZE)    #Create replay buffer
         self.load_weights()
-        print('Created network %d' % self.node)
+        # print('Created network %d' % self.node)
 
     def load_weights(self):
         #Now load the weight
@@ -198,7 +203,7 @@ class DDPGPolicyNode:
         a_t[0][0] = noise_t[0][0]
         a_t[0][1] = noise_t[0][1]
         a_t[0][2] = noise_t[0][2]
-        print('orig was %s, new is %s' % (a_t_original[0], a_t[0]))
+        # print('orig was %s, new is %s' % (a_t_original[0], a_t[0]))
         
         return a_t[0]
 
@@ -231,7 +236,9 @@ class DDPGPolicyNode:
         return loss
 
 
-def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
+def playGame(screen):    
+
+    global train_indicator
     EXPLORE = 10000.
     episode_count = 100000
     max_steps = 5000
@@ -269,6 +276,9 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
     ou_params_fast = [0, 0.6, 0.3, 2, 0.4, 0.1, 2, 0.4, 0.1]
     ou_params_slow = [0, 0.6, 0.3, 1.33, 0.3, 0.1, 1.33, 0.3, 0.1]
 
+    networks_init = 0
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
+
     # Policy 1: learn to go right lane on a rectangle
     def init1(info):
         return info['on_rect'] and info['traffic_light'] is None and not info['off_road']
@@ -281,6 +291,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             return [off_road, decelerate_to_halt]
     # policy1 = PolicyNode(1, init1, exit1, ou_params_fast)
     policy1 = QPolicyNode(1, init1, exit1)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 2: decelerate to halt to the traffic light
     def init2(info):
@@ -288,7 +299,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
     def exit2(info):
         type_intersection = info['type_intersection']
         if type_intersection is not None:
-            print(type_intersection)
+            # print(type_intersection)
             if type_intersection == 3:
                 next_turn = np.random.choice(stop_and_wait3, 1)[0]
             elif type_intersection == 4:
@@ -298,6 +309,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             return [off_road]
     # policy2 = PolicyNode(2, init2, exit2, ou_params_slow)
     policy2 = QPolicyNode(2, init2, exit2)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 3: halt until we have left sign
     def init3(info):
@@ -312,6 +324,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             return [off_road, drive_straight]
     # policy3 = PolicyNode(3, init3, exit3, ou_params_slow)
     policy3 = QPolicyNode(3, init3, exit3)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 4: halt until we have front sign
     def init4(info):
@@ -326,6 +339,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             return [off_road, drive_straight]
     # policy4 = PolicyNode(4, init4, exit4, ou_params_slow)
     policy4 = QPolicyNode(4, init4, exit4)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 5: halt until we have right sign
     def init5(info):
@@ -340,6 +354,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             return [off_road, drive_straight]
     # policy5 = PolicyNode(5, init5, exit5, ou_params_slow)
     policy5 = QPolicyNode(5, init5, exit5)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 6, 7, 8: make a left turn, straight, right turn
     def init678(info):
@@ -350,8 +365,11 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
     # policy7 = PolicyNode(7, init678, exit678, ou_params_fast)
     # policy8 = PolicyNode(8, init678, exit678, ou_params_fast)
     policy6 = QPolicyNode(6, init678, exit678)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
     policy7 = QPolicyNode(7, init678, exit678)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
     policy8 = QPolicyNode(8, init678, exit678)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Policy 9: if we're offroad
     def init9(info):
@@ -360,6 +378,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
         return [1, 2, 6, 7, 8]
     # policy9 = PolicyNode(9, init9, exit9, ou_params_slow)
     policy9 = QPolicyNode(9, init9, exit9)
+    showOnScreen(screen, 'Init %d networks ...' % networks_init)
 
     # Put all together
     policies = [None, policy1, policy2, policy3, policy4, policy5, policy6, policy7, policy8, policy9]
@@ -382,10 +401,11 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
         elif a == 2: return np.add(key_press(2), key_press(3))
         elif a == 3: return np.array(key_press(4))
 
-    print('Starting ...')
-    for ep in range(episode_count):
+    ep = 1
+    total_reward_str = ""
+    while ep <= episode_count:
 
-        print("Episode : " + str(ep))
+        # print("Episode : " + str(ep))
         log_file2.write("Episode : " + str(ep) + "\n")
 
         ob = env.reset()
@@ -416,7 +436,8 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
                     ob, r_t, done, info = env.step([get_control_vec(e) for e in a_t], curr_node)
                 except:
                     loop = True
-                    print('wtf')
+                    # print('wtf')
+                    showOnScreen(screen, 'wtf')
                 else:
                     loop = False
 
@@ -447,7 +468,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
                     if policies[exit_node].init(info[i]):
                         curr_node[i] = exit_node
 
-            print("%s\t Episode: %d, Step: %d, Action: %s, Reward: %s, Loss: %s" % (str([HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, loss))
+            showOnScreen(screen, "%s\n\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\nLoss: %s\n\n%s" % (str([HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, loss, total_reward_str))
             log_file2.write("Episode: %d, Step: %d, Action: %s, Reward: %s, Loss: %s, Currnodes: %s\n" % (ep, step, a_t, r_t, loss, str([HUMAN_NAMES[x] for x in curr_node])))            
             log_file2.write("All: %s\n" % (info))
             step += 1
@@ -465,18 +486,27 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
                     for j in range(1, len(HUMAN_NAMES)+1):
                         policies[j].save_weights()
 
-        print("TOTAL REWARD @ " + str(ep) +"-th Episode  : Reward " + str(total_reward))
-        print("Total Step: " + str(step))
-        print("")
+        total_reward_str = str(total_reward)
+        # print("TOTAL REWARD @ " + str(ep) +"-th Episode  : Reward " + str(total_reward))
+        # print("Total Step: " + str(step))
+        # print("")
         log_file2.write("TOTAL REWARD @ " + str(ep) +"-th Episode  : Reward " + str(total_reward) + "\n")
         log_file2.write("Total Step: " + str(step) + "\n")
         log_file2.write("\n")
         log_file2.flush()
 
+        ep += 1
+
     env.end()  # This is for shutting down TORCS
     log_file2.write("Finish.\n")
     log_file2.close()
 
+def showOnScreen(screen, data):
+    screen.clear()
+    lines = data.split("\n")
+    for line_num, line in enumerate(lines):
+        screen.addstr(line_num+5, 5, data)
+    screen.refresh()
 
 if __name__ == "__main__":
-    playGame(1)
+    wrapper(playGame)
