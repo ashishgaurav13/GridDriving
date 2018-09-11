@@ -19,13 +19,13 @@ class BasicOptions:
         self.off_road = 9
 
         self.HUMAN_NAMES = {}
-        self.HUMAN_NAMES[1] = 'drive_straight'
-        self.HUMAN_NAMES[2] = 'decelerate_to_halt'
+        self.HUMAN_NAMES[1] = 'drive_fwd'
+        self.HUMAN_NAMES[2] = 'decel_to_halt'
         self.HUMAN_NAMES[3] = 'wait_left'
         self.HUMAN_NAMES[4] = 'wait_straight'
         self.HUMAN_NAMES[5] = 'wait_right'
         self.HUMAN_NAMES[6] = 'left_on_junc'
-        self.HUMAN_NAMES[7] = 'straight_on_junc'
+        self.HUMAN_NAMES[7] = 'fwd_on_junc'
         self.HUMAN_NAMES[8] = 'right_on_junc'
         self.HUMAN_NAMES[9] = 'off_road'
 
@@ -45,23 +45,68 @@ class BasicOptions:
             QPolicyNode(9, self.init9, self.exit9)
         ]
 
-    # Policy 1: learn to go right lane on a rectangle
-    def init1(self, info):
-        return info['on_rect'] and info['traffic_light'] is None and not info['off_road']
+        self.lc_node1 = [[0, 0, 0] for i in range(NUM_VEHICLES)] # local counts for node 1
+        self.assign_node1 = [False for i in range(NUM_VEHICLES)]
 
-    def exit1(self, info):
+        self.start_vel_node2 = [0 for i in range(NUM_VEHICLES)]
+        self.end_vel_node2 = [0 for i in range(NUM_VEHICLES)]
+        self.assign_node2 = [False for i in range(NUM_VEHICLES)]
+
+        self.num_brakes_node3 = [0 for i in range(NUM_VEHICLES)]
+        self.assign_node3 = [False for i in range(NUM_VEHICLES)]
+
+        self.num_brakes_node4 = [0 for i in range(NUM_VEHICLES)]
+        self.assign_node4 = [False for i in range(NUM_VEHICLES)]
+
+        self.num_brakes_node5 = [0 for i in range(NUM_VEHICLES)]
+        self.assign_node5 = [False for i in range(NUM_VEHICLES)]
+
+        self.target_pos_node6 = [(0, 0) for i in range(NUM_VEHICLES)]
+        self.entering_node6 = [False for i in range(NUM_VEHICLES)]
+        self.assign_node6 = [False for i in range(NUM_VEHICLES)]
+
+        self.target_pos_node7 = [(0, 0) for i in range(NUM_VEHICLES)]
+        self.entering_node7 = [False for i in range(NUM_VEHICLES)]
+        self.assign_node7 = [False for i in range(NUM_VEHICLES)]
+
+        self.target_pos_node8 = [(0, 0) for i in range(NUM_VEHICLES)]
+        self.entering_node8 = [False for i in range(NUM_VEHICLES)]
+        self.assign_node8 = [False for i in range(NUM_VEHICLES)]
+
+        self.entering_node9 = [False for i in range(NUM_VEHICLES)]
+        self.last_node_before_9 = [0 for i in range(NUM_VEHICLES)]
+
+    # Policy 1: learn to go right lane on a rectangle
+    def init1(self, info, car_idx):
+        result = info['on_rect'] and info['traffic_light'] is None and not info['off_road']
+        if result:
+            self.lc_node1[car_idx] = [0, 0, 0]
+        return result
+
+    def exit1(self, info, car_idx):
+        if info['speed'] >= 5:
+            if info['lane_localization'] == "left":
+                self.lc_node1[car_idx][0] += 1
+            elif info['lane_localization'] == "right":
+                self.lc_node1[car_idx][1] += 1
+            else:
+                self.lc_node1[car_idx][2] += 1
+
         if info['only_turn'] == "left" and info['junction']:
-            return [self.off_road, self.left_on_junc, self.decelerate_to_halt]
+            return [self.off_road, self.left_on_junc]
         elif info['only_turn'] == "right" and info['junction']:
-            return [self.off_road, self.right_on_junc, self.decelerate_to_halt]
+            return [self.off_road, self.right_on_junc]
         else:
             return [self.off_road, self.decelerate_to_halt]
 
     # Policy 2: decelerate to halt to the traffic light
-    def init2(self, info):
-        return info['on_rect'] and info['traffic_light'] is not None and not info['off_road']
+    def init2(self, info, car_idx):
+        result = info['on_rect'] and info['traffic_light'] is not None and not info['off_road']
+        if result:
+            self.start_vel_node2[car_idx] = info['speed']
+        return result
 
-    def exit2(self, info):
+    def exit2(self, info, car_idx):
         type_intersection = info['type_intersection']
         if type_intersection is not None:
             # print(type_intersection)
@@ -74,53 +119,54 @@ class BasicOptions:
             return [self.off_road]
 
     # Policy 3: halt until we have left sign
-    def init3(self, info):
+    def init3(self, info, car_idx):
         return info['traffic_light'] is not None and not info['off_road']
 
-    def exit3(self, info):
+    def exit3(self, info, car_idx):
         if info['traffic_light'] == 'left':
-            return [self.off_road, self.left_on_junc, self.drive_straight]
+            return [self.off_road, self.left_on_junc]
         elif info['traffic_light'] is None:
             # we accidentally entered this state, no traffic light now, just move
-            return [self.off_road, self.left_on_junc, self.drive_straight]
+            return [self.off_road, self.left_on_junc]
         else:
-            return [self.off_road, self.drive_straight]
+            return [self.off_road]
+
     # Policy 4: halt until we have front sign
-    def init4(self, info):
+    def init4(self, info, car_idx):
         return info['traffic_light'] is not None and not info['off_road']
 
-    def exit4(self, info):
+    def exit4(self, info, car_idx):
         if info['traffic_light'] == 'straight':
-            return [self.off_road, self.straight_on_junc, self.drive_straight]
+            return [self.off_road, self.straight_on_junc]
         elif info['traffic_light'] is None:
             # we accidentally entered this state, no traffic light now, just move
-            return [self.off_road, self.straight_on_junc, self.drive_straight]
+            return [self.off_road, self.straight_on_junc]
         else:
-            return [self.off_road, self.drive_straight]
+            return [self.off_road]
 
     # Policy 5: halt until we have right sign
-    def init5(self, info):
+    def init5(self, info, car_idx):
         return info['traffic_light'] is not None and not info['off_road']
 
-    def exit5(self, info):
+    def exit5(self, info, car_idx):
         if info['traffic_light'] == 'right':
-            return [self.off_road, self.right_on_junc, self.drive_straight]
+            return [self.off_road, self.right_on_junc]
         elif info['traffic_light'] is None:
             # we accidentally entered this state, no traffic light now, just move
-            return [self.off_road, self.right_on_junc, self.drive_straight]
+            return [self.off_road, self.right_on_junc]
         else:
-            return [self.off_road, self.drive_straight]
+            return [self.off_road]
 
     # Policy 6, 7, 8: make a left turn, straight, right turn
-    def init678(self, info):
+    def init678(self, info, car_idx):
         return info['junction'] and not info['off_road']
 
-    def exit678(self, info):
+    def exit678(self, info, car_idx):
         return [self.off_road, self.drive_straight]
 
     # Policy 9: if we're offroad
-    def init9(self, info):
+    def init9(self, info, car_idx):
         return info['off_road']
 
-    def exit9(self, info):
+    def exit9(self, info, car_idx):
         return [1, 2, 6, 7, 8]

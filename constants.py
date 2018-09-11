@@ -42,7 +42,7 @@ LANE_SEP_COLOR = [0.6, 0.6, 0.6]
 
 BUFFER_SIZE = 10000
 MIN_BUFFER_SIZE_BEFORE_TRAIN = 1000
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 GAMMA = 0.99
 TAU = 0.001     #Target Network HyperParameters
 LRA = 0.0001    #Learning rate for Actor

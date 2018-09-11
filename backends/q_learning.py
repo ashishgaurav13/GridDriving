@@ -34,9 +34,11 @@ class QPolicyNode:
 
     def make_network(self):
         S = Input(shape=state_dim)
-        C = Conv2D(32, kernel_size=(3, 3), init='uniform', activation='relu')(S)
-        F = Flatten()(C)
-        h0 = Dense(256, activation='relu', init='uniform')(F)
+        C1 = Conv2D(32, kernel_size=(4, 4), strides=2, init='uniform', activation='relu')(S)
+        C2 = Conv2D(64, kernel_size=(3, 3), strides=2, init='uniform', activation='relu')(C1)
+        C3 = Conv2D(64, kernel_size=(3, 3), strides=1, init='uniform', activation='relu')(C2)
+        F = Flatten()(C3)
+        h0 = Dense(192, activation='relu', init='uniform')(F)
         h1 = Dense(512, activation='relu', init='uniform')(h0)
         O = Dense(4, activation='softmax', init='uniform')(h1)
         self.model = Model(input=S, output=O)
@@ -44,7 +46,8 @@ class QPolicyNode:
         self.model.compile(loss='mse',optimizer=self.adam)
         self.load_weights()
         self.buff = ReplayBuffer(BUFFER_SIZE)    #Create replay buffer
-        print('Created network %d' % self.node)
+        # print(self.model.summary())
+        print('Created network %d (%d params)' % (self.node, self.model.count_params()))
 
     def load_weights(self):
         #Now load the weight

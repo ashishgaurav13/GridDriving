@@ -18,7 +18,9 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import datetime # for logging timestamp
+import traceback
 
+np.set_printoptions(suppress=True)
 initTf(tf, K)
 
 def playGame():    
@@ -41,7 +43,7 @@ def playGame():
     options = BasicOptions()
 
     # Create Env
-    env = CarGridDriving()
+    env = CarGridDriving(options)
 
     # map integer keypress to action
     def key_press(k):
@@ -60,6 +62,10 @@ def playGame():
 
     ep = 1
     total_reward_str = ""
+    episode_loss = []
+    episode_reward = []
+    count_steps = []
+    until_last_ep_stats = ""
     while ep <= episode_count:
 
         print("Episode : " + str(ep))
@@ -72,8 +78,13 @@ def playGame():
         total_reward = [0. in range(NUM_VEHICLES)]
         counts = [{} for i in range(NUM_VEHICLES)]
         break_episode = False
+
+        episode_loss.append([[0 for eli in range(10)] for elvi in range(NUM_VEHICLES)])
+        episode_reward.append([[0 for eri in range(10)] for ervi in range(NUM_VEHICLES)])
+        count_steps.append([[0 for csi in range(10)] for csvi in range(NUM_VEHICLES)])
+
         for j in range(max_steps):
-            loss = [0 for i in range(NUM_VEHICLES)]
+            loss = [[0 for k in range(10)] for i in range(NUM_VEHICLES)]
             for i in range(NUM_VEHICLES):
                 options.policies[curr_node[i]].epsilon -= 1.0 / EXPLORE
             a_t = []
@@ -92,14 +103,57 @@ def playGame():
                     ob, r_t, done, info = env.step([get_control_vec(e) for e in a_t], curr_node)
                 except:
                     loop = True
-                    print('wtf')
+                    traceback.print_exc()
+                    exit(1)
                 else:
                     loop = False
 
             s_t1 = ob
         
             for i in range(NUM_VEHICLES):
-                options.policies[curr_node[i]].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+
+                # delayed sparse rewards
+                if options.assign_node1[i] == True:
+                    options.policies[1].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][1] += r_t[i]
+                    count_steps[-1][i][1] += 1
+                elif options.assign_node2[i] == True:
+                    options.policies[2].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][2] += r_t[i]
+                    count_steps[-1][i][2] += 1
+                elif options.assign_node3[i] == True:
+                    options.policies[3].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][3] += r_t[i]
+                    count_steps[-1][i][3] += 1
+                elif options.assign_node4[i] == True:
+                    options.policies[4].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][4] += r_t[i]
+                    count_steps[-1][i][4] += 1
+                elif options.assign_node5[i] == True:
+                    options.policies[5].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][5] += r_t[i]
+                    count_steps[-1][i][5] += 1
+                elif options.assign_node6[i] == True:
+                    options.policies[6].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][6] += r_t[i]
+                    count_steps[-1][i][6] += 1
+                elif options.assign_node7[i] == True:
+                    options.policies[7].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][7] += r_t[i]
+                    count_steps[-1][i][7] += 1
+                elif options.assign_node8[i] == True:
+                    options.policies[8].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][8] += r_t[i]
+                    count_steps[-1][i][8] += 1
+                elif options.entering_node9[i] == True:
+                    options.policies[options.last_node_before_9[i]].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][options.last_node_before_9[i]] += r_t[i]
+                    count_steps[-1][i][options.last_node_before_9[i]] += 1
+                else:
+                    options.policies[curr_node[i]].add_to_replay(s_t[i], a_t[i], r_t[i], s_t1[i], done[i])
+                    episode_reward[-1][i][curr_node[i]] += r_t[i]
+                    count_steps[-1][i][curr_node[i]] += 1
+
                 if curr_node[i] not in counts[i]:
                     counts[i][curr_node[i]] = 1
                 else:
@@ -110,22 +164,129 @@ def playGame():
                     break_episode = True
             
                 #Do the batch update
-                if train_indicator and options.policies[curr_node[i]].buff.count() >= MIN_BUFFER_SIZE_BEFORE_TRAIN:
+                if train_indicator == 1 and options.policies[curr_node[i]].buff.count() >= MIN_BUFFER_SIZE_BEFORE_TRAIN:
                     if j > 50:
-                        loss[i] += options.policies[curr_node[i]].train(BATCH_SIZE)
+                        if options.assign_node1[i] == True:
+                            loss[i][1] += options.policies[1].train(BATCH_SIZE)
+                            episode_loss[-1][i][1] += loss[i][1]
+                        elif options.assign_node2[i] == True:
+                            loss[i][2] += options.policies[2].train(BATCH_SIZE)
+                            episode_loss[-1][i][2] += loss[i][2]
+                        elif options.assign_node3[i] == True:
+                            loss[i][3] += options.policies[3].train(BATCH_SIZE)
+                            episode_loss[-1][i][3] += loss[i][3]
+                        elif options.assign_node4[i] == True:
+                            loss[i][4] += options.policies[4].train(BATCH_SIZE)
+                            episode_loss[-1][i][4] += loss[i][4]
+                        elif options.assign_node5[i] == True:
+                            loss[i][5] += options.policies[5].train(BATCH_SIZE)
+                            episode_loss[-1][i][5] += loss[i][5]
+                        elif options.assign_node6[i] == True:
+                            loss[i][6] += options.policies[6].train(BATCH_SIZE)
+                            episode_loss[-1][i][6] += loss[i][6]
+                        elif options.assign_node7[i] == True:
+                            loss[i][7] += options.policies[7].train(BATCH_SIZE)
+                            episode_loss[-1][i][7] += loss[i][7]
+                        elif options.assign_node8[i] == True:
+                            loss[i][8] += options.policies[8].train(BATCH_SIZE)
+                            episode_loss[-1][i][8] += loss[i][8]
+                        elif options.entering_node9[i] == True:
+                            loss[i][options.last_node_before_9[i]] += options.policies[options.last_node_before_9[i]].train(BATCH_SIZE)
+                            episode_loss[-1][i][options.last_node_before_9[i]] += loss[i][options.last_node_before_9[i]]
+                        else:
+                            loss[i][curr_node[i]] += options.policies[curr_node[i]].train(BATCH_SIZE)
+                            episode_loss[-1][i][curr_node[i]] += loss[i][curr_node[i]]
 
             total_reward = list(np.add(total_reward, r_t))
             s_t = s_t1
 
             # Change nodes
             for i in range(NUM_VEHICLES):
-                for exit_node in options.policies[curr_node[i]].exit(info[i]):
-                    if options.policies[exit_node].init(info[i]):
-                        curr_node[i] = exit_node
 
-            print("%s\n\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\nLoss: %s\n\n%s" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, loss, total_reward_str))
+                if options.assign_node1[i] == True:
+                    options.assign_node1[i] = False
+                if options.assign_node2[i] == True:
+                    options.start_vel_node2[i] = 0
+                    options.end_vel_node2[i] = 0
+                    options.assign_node2[i] = False
+                if options.assign_node3[i] == True:
+                    options.num_brakes_node3[i] = 0
+                    options.assign_node3[i] = False
+                if options.assign_node4[i] == True:
+                    options.num_brakes_node4[i] = 0
+                    options.assign_node4[i] = False
+                if options.assign_node5[i] == True:
+                    options.num_brakes_node5[i] = 0
+                    options.assign_node5[i] = False
+                if options.assign_node6[i] == True:
+                    options.target_pos_node6[i] = (0, 0)
+                    options.assign_node6[i] = False
+                if options.assign_node7[i] == True:
+                    options.target_pos_node7[i] = (0, 0)
+                    options.assign_node7[i] = False
+                if options.assign_node8[i] == True:
+                    options.target_pos_node8[i] = (0, 0)
+                    options.assign_node8[i] = False
+
+                if options.entering_node6[i] == True:
+                    options.entering_node6[i] = False
+                if options.entering_node7[i] == True:
+                    options.entering_node7[i] = False
+                if options.entering_node8[i] == True:
+                    options.entering_node8[i] = False
+                if options.entering_node9[i] == True:
+                    options.last_node_before_9[i] = 0
+                    options.entering_node9[i] = False
+
+                if curr_node[i] == 3:
+                    if a_t[i] == 3: # brake
+                        options.num_brakes_node3[i] += 1
+                if curr_node[i] == 4:
+                    if a_t[i] == 3: # brake
+                        options.num_brakes_node4[i] += 1
+                if curr_node[i] == 5:
+                    if a_t[i] == 3: # brake
+                        options.num_brakes_node5[i] += 1
+
+                for exit_node in options.policies[curr_node[i]].exit(info[i], i):
+                    if options.policies[exit_node].init(info[i], i):
+                        if curr_node[i] == 1:
+                            options.assign_node1[i] = True
+                        if curr_node[i] == 2:
+                            options.end_vel_node2[i] = info[i]['speed']
+                            options.assign_node2[i] = True
+                        if curr_node[i] == 3:
+                            options.assign_node3[i] = True
+                        if curr_node[i] == 4:
+                            options.assign_node4[i] = True
+                        if curr_node[i] == 5:
+                            options.assign_node5[i] = True
+                        if curr_node[i] == 6:
+                            options.assign_node6[i] = True
+                        if curr_node[i] == 7:
+                            options.assign_node7[i] = True
+                        if curr_node[i] == 8:
+                            options.assign_node8[i] = True
+
+                        if exit_node == 6:
+                            options.entering_node6[i] = True
+                        if exit_node == 7:
+                            options.entering_node7[i] = True
+                        if exit_node == 8:
+                            options.entering_node8[i] = True
+                        if exit_node == 9:
+                            options.last_node_before_9[i] = curr_node[i]
+                            options.entering_node9[i] = True
+
+                        curr_node[i] = exit_node
+                        break # just assign to one exit node (the first one)
+
+            print("%s\n\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\nLoss: %s\n%s%s\n\n" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, loss, total_reward_str, until_last_ep_stats))
             log_file2.write("Episode: %d, Step: %d, Action: %s, Reward: %s, Loss: %s, Currnodes: %s\n" % (ep, step, a_t, r_t, loss, str([options.HUMAN_NAMES[x] for x in curr_node])))
             log_file2.write("All: %s\n" % (info))
+            log_file2.write("EpLoss: %s\n" % (episode_loss))
+            log_file2.write("EpReward: %s\n" % (episode_reward))
+            # log_file2.write()
             step += 1
 
             # Render a viewer for each car
@@ -138,8 +299,23 @@ def playGame():
         if np.mod(ep, 3) == 0:
             if train_indicator:
                 for i in range(NUM_VEHICLES):
-                    for j in range(1, len(HUMAN_NAMES)+1):
+                    for j in range(1, len(options.HUMAN_NAMES)+1):
                         options.policies[j].save_weights()
+
+        epblock = episode_reward[-1]
+        for vehindex, vehblock in enumerate(epblock):
+            for nodeindex, nodeblock in enumerate(vehblock):
+                cs_respective = count_steps[-1][vehindex][nodeindex]
+                if cs_respective > 0:
+                    episode_reward[-1][vehindex][nodeindex] /= cs_respective*1.0
+                    episode_loss[-1][vehindex][nodeindex] /= cs_respective*1.0
+
+        avg_reward = np.mean(episode_reward, axis=0)
+        avg_loss = np.mean(episode_loss, axis=0)
+        until_last_ep_stats = "\n"
+        for iii in range(1, 10):
+            until_last_ep_stats += "%s:\t%.6f\t%.6f\n" % (options.HUMAN_NAMES[iii], avg_reward[:, iii], avg_loss[:, iii])
+        # until_last_ep_stats = "\nAvgRewardUntilLastEp: %s\nAvgLossUntilLastEp: %s\n" % (avg_reward.tolist(), avg_loss.tolist())
 
         total_reward_str = str(total_reward)
         print("TOTAL REWARD @ " + str(ep) +"-th Episode  : Reward " + str(total_reward))

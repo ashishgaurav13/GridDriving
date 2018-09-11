@@ -111,9 +111,9 @@ def do_random_deletions(lattice, edges_orig, n, constraints, max_tries=1000):
 		is_satisfied = check_constraints(new_lattice, constraints)
 		if not is_satisfied: continue
 		else: 
-			print('Took %d inner iterations for random deletions' % num_tries)
+			# print('Took %d inner iterations for random deletions' % num_tries)
 			return new_lattice, True
-	print('Took %d inner iterations for random deletions' % num_tries)
+	# print('Took %d inner iterations for random deletions' % num_tries)
 	return lattice, False
 
 # Check constraints on the degree of nodes in a lattice
