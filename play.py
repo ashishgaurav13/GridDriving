@@ -281,7 +281,7 @@ def playGame():
                         curr_node[i] = exit_node
                         break # just assign to one exit node (the first one)
 
-            print("%s\n\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\nLoss: %s\n%s%s\n\n" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, loss, total_reward_str, until_last_ep_stats))
+            print("Maneuver: %s\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\n%s\n\n" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, until_last_ep_stats))
             log_file2.write("Episode: %d, Step: %d, Action: %s, Reward: %s, Loss: %s, Currnodes: %s\n" % (ep, step, a_t, r_t, loss, str([options.HUMAN_NAMES[x] for x in curr_node])))
             log_file2.write("All: %s\n" % (info))
             log_file2.write("EpLoss: %s\n" % (episode_loss))
@@ -312,9 +312,9 @@ def playGame():
 
         avg_reward = np.mean(episode_reward, axis=0)
         avg_loss = np.mean(episode_loss, axis=0)
-        until_last_ep_stats = "\n"
+        until_last_ep_stats = "\noption\t\timm_loss\tavg_reward\tavg_loss\n"
         for iii in range(1, 10):
-            until_last_ep_stats += "%s:\t%.6f\t%.6f\n" % (options.HUMAN_NAMES[iii], avg_reward[:, iii], avg_loss[:, iii])
+            until_last_ep_stats += "%s:\t%.6f\t%.6f\t%.6f\n" % (options.HUMAN_NAMES[iii], np.array(loss)[:, iii], avg_reward[:, iii], avg_loss[:, iii])
         # until_last_ep_stats = "\nAvgRewardUntilLastEp: %s\nAvgLossUntilLastEp: %s\n" % (avg_reward.tolist(), avg_loss.tolist())
 
         total_reward_str = str(total_reward)
