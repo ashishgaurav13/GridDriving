@@ -53,6 +53,7 @@ class BasicOptions:
         self.last_rect_node1 = [set() for i in range(NUM_VEHICLES)]
         self.assign_node1 = [False for i in range(NUM_VEHICLES)]
         self.entering_node1 = [True for i in range(NUM_VEHICLES)]
+        self.direction_node1 = [None for i in range(NUM_VEHICLES)]
 
         self.start_vel_node2 = [0 for i in range(NUM_VEHICLES)]
         self.end_vel_node2 = [0 for i in range(NUM_VEHICLES)]
@@ -93,7 +94,8 @@ class BasicOptions:
                 self.pos_node1[car_idx].append(np.array([info['pos'].x, info['pos'].y]))
             print(info['last_rect'])
             if Polygon(info['last_rect']).contains(Point(info['pos'].x, info['pos'].y)):
-                self.last_rect_node1[car_idx].add(deepcopy(info['last_rect']))
+                if isLaneRect(info['last_rect']):
+                    self.last_rect_node1[car_idx].add(deepcopy(info['last_rect']))
             if info['lane_localization'] == "left":
                 self.lc_node1[car_idx][0] += 1
             elif info['lane_localization'] == "right":

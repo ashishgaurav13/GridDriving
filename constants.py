@@ -41,9 +41,9 @@ ROAD_COLOR = [0.4, 0.4, 0.4]
 LANE_SEP_COLOR = [0.6, 0.6, 0.6]
 
 BUFFER_SIZE = 10000
-MIN_BUFFER_SIZE_BEFORE_TRAIN = 1000
+MIN_BUFFER_SIZE_BEFORE_TRAIN = 3000
 BATCH_SIZE = 16
-GAMMA = 0.99
+GAMMA = 0.95
 TAU = 0.001     #Target Network HyperParameters
 LRA = 0.0001    #Learning rate for Actor
 LRC = 0.001     #Lerning rate for Critic
@@ -59,3 +59,7 @@ def isLaneRect(rect):
 		xset.add(pt[0])
 		yset.add(pt[1])
 	return len(xset) == 2 and len(yset) == 2 and (max(xset)-min(xset) == LANE_WIDTH or max(yset)-min(yset) == LANE_WIDTH)
+
+EXPLORE = 100000.
+INITIAL_EPSILON = 0.5
+FINAL_EPSILON = 0.0001

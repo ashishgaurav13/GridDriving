@@ -26,7 +26,6 @@ initTf(tf, K)
 def playGame():    
 
     global train_indicator
-    EXPLORE = 10000.
     episode_count = 100000
     max_steps = 5000
     reward = 0
@@ -66,6 +65,7 @@ def playGame():
     episode_reward = []
     count_steps = []
     until_last_ep_stats = ""
+    q_values_str = ""
     while ep <= episode_count:
 
         print("Episode : " + str(ep))
@@ -86,10 +86,16 @@ def playGame():
         for j in range(max_steps):
             loss = [[0 for k in range(10)] for i in range(NUM_VEHICLES)]
             for i in range(NUM_VEHICLES):
-                options.policies[curr_node[i]].epsilon -= 1.0 / EXPLORE
+                if options.policies[curr_node[i]].buff.count() >= MIN_BUFFER_SIZE_BEFORE_TRAIN and options.policies[curr_node[i]].epsilon > FINAL_EPSILON:
+                    options.policies[curr_node[i]].epsilon -= (INITIAL_EPSILON-FINAL_EPSILON) / EXPLORE
             a_t = []
             for i, state in enumerate(s_t):
-                greedy_action = np.argmax(options.policies[curr_node[i]].predict(state))
+                q_values = options.policies[curr_node[i]].predict(state)
+                if curr_node[i] == 1 or options.assign_node1[i] == True:
+                    q_values_str = str(["%.6f" % item for item in q_values.tolist()])
+                else:
+                    q_values_str = ""
+                greedy_action = np.argmax(q_values)
                 random_action = np.random.choice(4)
                 if np.random.rand(1) <= options.policies[curr_node[i]].epsilon:
                     a_t.append(random_action)
@@ -165,37 +171,37 @@ def playGame():
             
                 #Do the batch update
                 if train_indicator == 1 and options.policies[curr_node[i]].buff.count() >= MIN_BUFFER_SIZE_BEFORE_TRAIN:
-                    if j > 50:
-                        if options.assign_node1[i] == True:
-                            loss[i][1] += options.policies[1].train(BATCH_SIZE)
-                            episode_loss[-1][i][1] += loss[i][1]
-                        elif options.assign_node2[i] == True:
-                            loss[i][2] += options.policies[2].train(BATCH_SIZE)
-                            episode_loss[-1][i][2] += loss[i][2]
-                        elif options.assign_node3[i] == True:
-                            loss[i][3] += options.policies[3].train(BATCH_SIZE)
-                            episode_loss[-1][i][3] += loss[i][3]
-                        elif options.assign_node4[i] == True:
-                            loss[i][4] += options.policies[4].train(BATCH_SIZE)
-                            episode_loss[-1][i][4] += loss[i][4]
-                        elif options.assign_node5[i] == True:
-                            loss[i][5] += options.policies[5].train(BATCH_SIZE)
-                            episode_loss[-1][i][5] += loss[i][5]
-                        elif options.assign_node6[i] == True:
-                            loss[i][6] += options.policies[6].train(BATCH_SIZE)
-                            episode_loss[-1][i][6] += loss[i][6]
-                        elif options.assign_node7[i] == True:
-                            loss[i][7] += options.policies[7].train(BATCH_SIZE)
-                            episode_loss[-1][i][7] += loss[i][7]
-                        elif options.assign_node8[i] == True:
-                            loss[i][8] += options.policies[8].train(BATCH_SIZE)
-                            episode_loss[-1][i][8] += loss[i][8]
-                        elif options.entering_node9[i] == True:
-                            loss[i][options.last_node_before_9[i]] += options.policies[options.last_node_before_9[i]].train(BATCH_SIZE)
-                            episode_loss[-1][i][options.last_node_before_9[i]] += loss[i][options.last_node_before_9[i]]
-                        else:
-                            loss[i][curr_node[i]] += options.policies[curr_node[i]].train(BATCH_SIZE)
-                            episode_loss[-1][i][curr_node[i]] += loss[i][curr_node[i]]
+                    # if j > 50:
+                    if options.assign_node1[i] == True:
+                        loss[i][1] += options.policies[1].train(BATCH_SIZE)
+                        episode_loss[-1][i][1] += loss[i][1]
+                    elif options.assign_node2[i] == True:
+                        loss[i][2] += options.policies[2].train(BATCH_SIZE)
+                        episode_loss[-1][i][2] += loss[i][2]
+                    elif options.assign_node3[i] == True:
+                        loss[i][3] += options.policies[3].train(BATCH_SIZE)
+                        episode_loss[-1][i][3] += loss[i][3]
+                    elif options.assign_node4[i] == True:
+                        loss[i][4] += options.policies[4].train(BATCH_SIZE)
+                        episode_loss[-1][i][4] += loss[i][4]
+                    elif options.assign_node5[i] == True:
+                        loss[i][5] += options.policies[5].train(BATCH_SIZE)
+                        episode_loss[-1][i][5] += loss[i][5]
+                    elif options.assign_node6[i] == True:
+                        loss[i][6] += options.policies[6].train(BATCH_SIZE)
+                        episode_loss[-1][i][6] += loss[i][6]
+                    elif options.assign_node7[i] == True:
+                        loss[i][7] += options.policies[7].train(BATCH_SIZE)
+                        episode_loss[-1][i][7] += loss[i][7]
+                    elif options.assign_node8[i] == True:
+                        loss[i][8] += options.policies[8].train(BATCH_SIZE)
+                        episode_loss[-1][i][8] += loss[i][8]
+                    elif options.entering_node9[i] == True:
+                        loss[i][options.last_node_before_9[i]] += options.policies[options.last_node_before_9[i]].train(BATCH_SIZE)
+                        episode_loss[-1][i][options.last_node_before_9[i]] += loss[i][options.last_node_before_9[i]]
+                    else:
+                        loss[i][curr_node[i]] += options.policies[curr_node[i]].train(BATCH_SIZE)
+                        episode_loss[-1][i][curr_node[i]] += loss[i][curr_node[i]]
 
             total_reward = list(np.add(total_reward, r_t))
             s_t = s_t1
@@ -206,9 +212,9 @@ def playGame():
                 if options.assign_node1[i] == True:
                     options.assign_node1[i] = False
                     options.lc_node1[i] = [0, 0, 0]
-                    # TODO (nullify pos_node1, last_rect)
                     options.pos_node1[i] = []
                     options.last_rect_node1[i] = set()
+                    options.direction_node1[i] = None
                     # exit(0)
                     break_episode = True # TODO
                 if options.assign_node2[i] == True:
@@ -291,7 +297,7 @@ def playGame():
                         curr_node[i] = exit_node
                         break # just assign to one exit node (the first one)
 
-            print("Maneuver: %s\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\n%s\n\n" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, until_last_ep_stats))
+            print("Maneuver: %s\nEpisode: %d\nStep: %d\nAction: %s\nReward: %s\nQ: %s\n%s\n\n" % (str([options.HUMAN_NAMES[x] for x in curr_node]), ep, step, a_t, r_t, q_values_str, until_last_ep_stats))
             log_file2.write("Episode: %d, Step: %d, Action: %s, Reward: %s, Loss: %s, Currnodes: %s\n" % (ep, step, a_t, r_t, loss, str([options.HUMAN_NAMES[x] for x in curr_node])))
             log_file2.write("All: %s\n" % (info))
             log_file2.write("EpLoss: %s\n" % (episode_loss))
@@ -312,13 +318,13 @@ def playGame():
                     for j in range(1, len(options.HUMAN_NAMES)+1):
                         options.policies[j].save_weights()
 
-        epblock = episode_reward[-1]
-        for vehindex, vehblock in enumerate(epblock):
-            for nodeindex, nodeblock in enumerate(vehblock):
-                cs_respective = count_steps[-1][vehindex][nodeindex]
-                if cs_respective > 0:
-                    episode_reward[-1][vehindex][nodeindex] /= cs_respective*1.0
-                    episode_loss[-1][vehindex][nodeindex] /= cs_respective*1.0
+        # epblock = episode_reward[-1]
+        # for vehindex, vehblock in enumerate(epblock):
+        #     for nodeindex, nodeblock in enumerate(vehblock):
+        #         cs_respective = count_steps[-1][vehindex][nodeindex]
+        #         if cs_respective > 0:
+        #             episode_reward[-1][vehindex][nodeindex] /= cs_respective*1.0
+        #             episode_loss[-1][vehindex][nodeindex] /= cs_respective*1.0
 
         tot_reward = np.sum(episode_reward[-10:], axis=0)
         avg_loss = np.mean(episode_loss[-10:], axis=0)

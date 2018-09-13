@@ -242,3 +242,5 @@ class Car:
             self.world.DestroyBody(w)
         self.wheels = []
 
+    def get_acc_direction(self):
+        return self.hull.GetWorldVector((0, 1))

@@ -29,7 +29,7 @@ class QPolicyNode:
         self.node = node
         self.init = init
         self.exit = exit
-        self.epsilon = 1
+        self.epsilon = INITIAL_EPSILON
         self.make_network()
 
     def make_network(self):
@@ -40,7 +40,7 @@ class QPolicyNode:
         F = Flatten()(C3)
         h0 = Dense(192, activation='relu', init='uniform')(F)
         h1 = Dense(512, activation='relu', init='uniform')(h0)
-        O = Dense(4, activation='softmax', init='uniform')(h1)
+        O = Dense(4, activation='linear', init='uniform')(h1)
         self.model = Model(input=S, output=O)
         self.adam = Adam(lr=1e-5)
         self.model.compile(loss='mse',optimizer=self.adam)
