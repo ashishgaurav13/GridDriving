@@ -427,36 +427,37 @@ class CarGridDriving(gym.Env):
                                 yset.add(pt[1])
                             xr, yr = max(xset)-min(xset), max(yset)-min(yset)
                             movement_dir = 0 if yr == LANE_WIDTH else 1
-                            if movement_dir == 0:
-                                if self.options.direction_node1[car_idx] is None:
-                                    possible_dir = b2Vec2((1, 0))
-                                    veh_pointing = self.cars[car_idx].get_acc_direction()
-                                    dot_prod = b2Dot(possible_dir, veh_pointing)
-                                    if dot_prod > 0: # (1, 0) is the right direction
-                                        self.options.direction_node1[car_idx] = possible_dir
+                            if self.infos[car_idx]['speed'] >= 10:
+                                if movement_dir == 0:
+                                    if self.options.direction_node1[car_idx] is None:
+                                        possible_dir = b2Vec2((1, 0))
+                                        veh_pointing = self.cars[car_idx].get_acc_direction()
+                                        dot_prod = b2Dot(possible_dir, veh_pointing)
+                                        if dot_prod > 0: # (1, 0) is the right direction
+                                            self.options.direction_node1[car_idx] = possible_dir
+                                        else:
+                                            self.options.direction_node1[car_idx] = b2Vec2((-1, 0))
                                     else:
-                                        self.options.direction_node1[car_idx] = b2Vec2((-1, 0))
+                                        correct_direction = self.options.direction_node1[car_idx]
+                                        dot_value = b2Dot(displacement, correct_direction)
+                                        step_rewards[car_idx] = 1.0*np.abs(dot_value)/(xr)
+                                        multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
+                                        step_rewards[car_idx] *= multiplier
                                 else:
-                                    correct_direction = self.options.direction_node1[car_idx]
-                                    dot_value = b2Dot(displacement, correct_direction)
-                                    step_rewards[car_idx] = 1.0*np.abs(dot_value)/(xr)
-                                    multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
-                                    step_rewards[car_idx] *= multiplier
-                            else:
-                                if self.options.direction_node1[car_idx] is None:
-                                    possible_dir = b2Vec2((0, 1))
-                                    veh_pointing = self.cars[car_idx].get_acc_direction()
-                                    dot_prod = b2Dot(possible_dir, veh_pointing)
-                                    if dot_prod > 0: # (0, 1) is the right direction
-                                        self.options.direction_node1[car_idx] = possible_dir
+                                    if self.options.direction_node1[car_idx] is None:
+                                        possible_dir = b2Vec2((0, 1))
+                                        veh_pointing = self.cars[car_idx].get_acc_direction()
+                                        dot_prod = b2Dot(possible_dir, veh_pointing)
+                                        if dot_prod > 0: # (0, 1) is the right direction
+                                            self.options.direction_node1[car_idx] = possible_dir
+                                        else:
+                                            self.options.direction_node1[car_idx] = b2Vec2((0, -1))
                                     else:
-                                        self.options.direction_node1[car_idx] = b2Vec2((0, -1))
-                                else:
-                                    correct_direction = self.options.direction_node1[car_idx]
-                                    dot_value = b2Dot(displacement, correct_direction)
-                                    step_rewards[car_idx] = 1.0*np.abs(dot_value)/(yr)
-                                    multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
-                                    step_rewards[car_idx] *= multiplier
+                                        correct_direction = self.options.direction_node1[car_idx]
+                                        dot_value = b2Dot(displacement, correct_direction)
+                                        step_rewards[car_idx] = 1.0*np.abs(dot_value)/(yr)
+                                        multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
+                                        step_rewards[car_idx] *= multiplier
 
                     # if entering node9, penalize
                     if self.options.entering_node9[car_idx] == True:
