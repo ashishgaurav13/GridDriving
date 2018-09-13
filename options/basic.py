@@ -4,6 +4,9 @@ sys.path.append('../')
 from constants import *
 from backends.ddpg import DDPGPolicyNode
 from backends.q_learning import QPolicyNode
+from copy import deepcopy
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
 
 class BasicOptions:
 
@@ -46,7 +49,10 @@ class BasicOptions:
         ]
 
         self.lc_node1 = [[0, 0, 0] for i in range(NUM_VEHICLES)] # local counts for node 1
+        self.pos_node1 = [[] for i in range(NUM_VEHICLES)]
+        self.last_rect_node1 = [set() for i in range(NUM_VEHICLES)]
         self.assign_node1 = [False for i in range(NUM_VEHICLES)]
+        self.entering_node1 = [True for i in range(NUM_VEHICLES)]
 
         self.start_vel_node2 = [0 for i in range(NUM_VEHICLES)]
         self.end_vel_node2 = [0 for i in range(NUM_VEHICLES)]
@@ -79,12 +85,15 @@ class BasicOptions:
     # Policy 1: learn to go right lane on a rectangle
     def init1(self, info, car_idx):
         result = info['on_rect'] and info['traffic_light'] is None and not info['off_road']
-        if result:
-            self.lc_node1[car_idx] = [0, 0, 0]
         return result
 
     def exit1(self, info, car_idx):
-        if info['speed'] >= 5:
+        if info['speed'] >= 10:
+            if not info['off_road']:
+                self.pos_node1[car_idx].append(np.array([info['pos'].x, info['pos'].y]))
+            print(info['last_rect'])
+            if Polygon(info['last_rect']).contains(Point(info['pos'].x, info['pos'].y)):
+                self.last_rect_node1[car_idx].add(deepcopy(info['last_rect']))
             if info['lane_localization'] == "left":
                 self.lc_node1[car_idx][0] += 1
             elif info['lane_localization'] == "right":

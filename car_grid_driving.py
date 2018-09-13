@@ -269,11 +269,13 @@ class CarGridDriving(gym.Env):
             'type_intersection': None,
             'junction': None,
             'speed': None,
+            'pos': None,
         }
         self.infos = [dict(empty_dict) for i in range(NUM_VEHICLES)]
         for car_idx in range(NUM_VEHICLES):
             rstate, values = self.render(mode="state_pixels", car_idx=car_idx)
             self.states.append(rstate) # TODO
+            pos = self.cars[car_idx].hull.position
             vel = self.cars[car_idx].hull.linearVelocity
             speed = np.sqrt(vel[0]**2+vel[1]**2)
             self.infos[car_idx]['traffic_light'] = values[0]
@@ -284,6 +286,8 @@ class CarGridDriving(gym.Env):
             self.infos[car_idx]['type_intersection'] = values[1]
             self.infos[car_idx]['only_turn'] = values[2]
             self.infos[car_idx]['speed'] = speed
+            self.infos[car_idx]['pos'] = pos
+            self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
 
         # find out reward for each of the cars
         drive_straight = 1
@@ -370,9 +374,40 @@ class CarGridDriving(gym.Env):
                 #
                 # What happens if the car doesn't move?
                 if self.options.assign_node1[car_idx] == True:
-                    ar = self.options.lc_node1[car_idx][1]
-                    al = self.options.lc_node1[car_idx][0]
-                    step_rewards[car_idx] = 0.1*(ar-al)
+                    minx, miny = np.inf, np.inf
+                    maxx, maxy = -np.inf, -np.inf
+                    for pos in self.options.pos_node1[car_idx]:
+                        minx, miny = min(minx, pos[0]), min(miny, pos[1])
+                        maxx, maxy = max(maxx, pos[0]), max(maxy, pos[1])
+                    movement_dir = 0 if maxx-minx > maxy-miny else 1
+                    xr, yr = 0, 0
+                    rect_list = list(self.options.last_rect_node1[car_idx])
+                    xset, yset = set(), set()
+                    for rindex in range(len(rect_list)):
+                        if not isLaneRect(rect_list[rindex]):
+                            continue
+                        for pos in rect_list[rindex]:
+                            xset.add(pos[0])
+                            yset.add(pos[1])
+                    if movement_dir == 0:
+                        target_distance = 0.01 # instead of 0 to avoid handling that bad case of 0/0 division
+                        if len(xset) > 0:
+                            target_distance = max(xset)-min(xset)
+                        covered_distance = 0.0
+                        if len(self.options.pos_node1[car_idx]) > 0:
+                            covered_distance = maxx-minx
+                        step_rewards[car_idx] = ((covered_distance)*5.0)/(target_distance)
+                    else:
+                        target_distance = 0.01 # instead of 0 to avoid handling that bad case of 0/0 division
+                        if len(yset) > 0:
+                            target_distance = max(yset)-min(yset)
+                        covered_distance = 0.0
+                        if len(self.options.pos_node1[car_idx]) > 0:
+                            covered_distance = maxy-miny
+                        step_rewards[car_idx] = ((covered_distance)*5.0)/(target_distance)
+                    # if entering node9, penalize
+                    if self.options.entering_node9[car_idx] == True:
+                        step_rewards[car_idx] -= 3
 
                 # N2: decel to stop
                 elif self.options.assign_node2[car_idx] == True:

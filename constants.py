@@ -52,3 +52,10 @@ action_dim = 3  #Steering/Acceleration/Brake
 state_dim = (96, 96, 1)
 
 train_indicator = 1 #1 means Train, 0 means simply Run
+
+def isLaneRect(rect):
+	xset, yset = set(), set()
+	for pt in rect:
+		xset.add(pt[0])
+		yset.add(pt[1])
+	return len(xset) == 2 and len(yset) == 2 and (max(xset)-min(xset) == LANE_WIDTH or max(yset)-min(yset) == LANE_WIDTH)

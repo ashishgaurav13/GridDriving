@@ -205,6 +205,12 @@ def playGame():
 
                 if options.assign_node1[i] == True:
                     options.assign_node1[i] = False
+                    options.lc_node1[i] = [0, 0, 0]
+                    # TODO (nullify pos_node1, last_rect)
+                    options.pos_node1[i] = []
+                    options.last_rect_node1[i] = set()
+                    # exit(0)
+                    break_episode = True # TODO
                 if options.assign_node2[i] == True:
                     options.start_vel_node2[i] = 0
                     options.end_vel_node2[i] = 0
@@ -228,6 +234,8 @@ def playGame():
                     options.target_pos_node8[i] = (0, 0)
                     options.assign_node8[i] = False
 
+                if options.entering_node1[i] == True:
+                    options.entering_node1[i] = False # TODO: needed?
                 if options.entering_node6[i] == True:
                     options.entering_node6[i] = False
                 if options.entering_node7[i] == True:
@@ -268,6 +276,8 @@ def playGame():
                         if curr_node[i] == 8:
                             options.assign_node8[i] = True
 
+                        if exit_node == 1:
+                            options.entering_node1[i] = True
                         if exit_node == 6:
                             options.entering_node6[i] = True
                         if exit_node == 7:
@@ -310,11 +320,13 @@ def playGame():
                     episode_reward[-1][vehindex][nodeindex] /= cs_respective*1.0
                     episode_loss[-1][vehindex][nodeindex] /= cs_respective*1.0
 
-        avg_reward = np.mean(episode_reward, axis=0)
-        avg_loss = np.mean(episode_loss, axis=0)
-        until_last_ep_stats = "\noption\t\timm_loss\tavg_reward\tavg_loss\n"
+        tot_reward = np.sum(episode_reward[-10:], axis=0)
+        avg_loss = np.mean(episode_loss[-10:], axis=0)
+        total_counts = np.sum(count_steps, axis=0)
+        until_last_ep_stats = "\noption\t\timm_loss\ttot_rew10\tavg_loss10\tsteps\n"
         for iii in range(1, 10):
-            until_last_ep_stats += "%s:\t%.6f\t%.6f\t%.6f\n" % (options.HUMAN_NAMES[iii], np.array(loss)[:, iii], avg_reward[:, iii], avg_loss[:, iii])
+            until_last_ep_stats += "%s:\t%.6f\t%.6f\t%.6f\t%d\n" % (options.HUMAN_NAMES[iii], np.array(loss)[:, iii], tot_reward[:, iii], avg_loss[:, iii], total_counts[:, iii])
+        # until_last_ep_stats = "\n\nRew: %s\n\nLoss: %s\n" % (episode_reward[-10:], episode_loss[-10:])
         # until_last_ep_stats = "\nAvgRewardUntilLastEp: %s\nAvgLossUntilLastEp: %s\n" % (avg_reward.tolist(), avg_loss.tolist())
 
         total_reward_str = str(total_reward)
