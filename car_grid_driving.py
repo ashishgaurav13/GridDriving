@@ -26,7 +26,7 @@ class CarGridDriving(gym.Env):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, options):
+    def __init__(self):
         
         # Init seed for randomness
         seed(self)
@@ -68,10 +68,6 @@ class CarGridDriving(gym.Env):
         # produce an observation space of rows x cols x 3
         state_dims = (STATE_H, STATE_W, 3)
         self.observation_spaces = make_n_state_spaces(NUM_VEHICLES, state_dims)
-
-        # options
-        self.options = options
-        self.curr_node = None
 
     def _destroy(self):
 
@@ -195,9 +191,8 @@ class CarGridDriving(gym.Env):
         return self.step([None for i in range(NUM_VEHICLES)])[0]
         
     # actions is a list of NUM_VEHICLES actions
-    # curr_node stores node info in options graph
     # assign_rewards tells whether the car needs a sparse reward or not
-    def step(self, actions, curr_node=None):
+    def step(self, actions):
 
         # apply the action to the available vehicles and step
         for car_idx, action in enumerate(actions):
@@ -290,250 +285,25 @@ class CarGridDriving(gym.Env):
             self.infos[car_idx]['pos'] = pos
             self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
 
-        # find out reward for each of the cars
-        drive_straight = 1
-        decelerate_to_halt = 2
-        stop_and_wait3 = [3, 5]
-        stop_and_wait4 = [3, 4, 5]
-        left_on_junc = 6
-        straight_on_junc = 7
-        right_on_junc = 8
-        off_road = 9
-        step_rewards = make_n_rewards(NUM_VEHICLES)
-        done_values = make_n_done_values(NUM_VEHICLES)
-
         # Reward Assignment (sparse)
+        step_rewards = [0 for i in range(len(actions))]
+        done_values = [False for i in range(len(actions))]
         for car_idx, action in enumerate(actions):
-            if action is not None:
-                
+               
                 step_rewards[car_idx] = 0
-
-                # N6, N7, N8: entering (determine target_pos)
-                if self.options.entering_node6[car_idx] == True or \
-                   self.options.entering_node7[car_idx] == True or \
-                   self.options.entering_node8[car_idx] == True:
-
-                    if self.cars[car_idx] and self.cars[car_idx].hull:
-                        x, y = self.cars[car_idx].hull.position
-                        relevant_node = self.last_relevant_node[car_idx]
-                        i = -1
-                        if relevant_node in self.which_points:
-                            i = self.which_points.index(relevant_node)
-                        if i != -1:
-                            x0, y0 = relevant_node[1]*EDGE_WIDTH, relevant_node[0]*EDGE_WIDTH
-                            lx, ly = x0-2*LANE_WIDTH, y0+0.5*LANE_WIDTH
-                            rx, ry = x0+2*LANE_WIDTH, y0-0.5*LANE_WIDTH
-                            sx, sy = x0+0.5*LANE_WIDTH, y0+2*LANE_WIDTH
-                            px, py = x0-0.5*LANE_WIDTH, y0-2*LANE_WIDTH
-                            dl = dist(x, y, lx, ly)
-                            dr = dist(x, y, rx, ry)
-                            ds = dist(x, y, sx, sy)
-                            dp = dist(x, y, px, py)
-                            # entering from left side of intersection
-                            if dl == min(dl, dr, ds, dp):
-                                if self.options.entering_node6[car_idx] == True:
-                                    self.options.target_pos_node6[car_idx] = (sx, sy)
-                                if self.options.entering_node7[car_idx] == True:
-                                    self.options.target_pos_node7[car_idx] = (rx, ry)
-                                if self.options.entering_node8[car_idx] == True:
-                                    self.options.target_pos_node8[car_idx] = (px, py)
-                            # entering from top side of intersection
-                            if ds == min(dl, dr, ds, dp):
-                                if self.options.entering_node6[car_idx] == True:
-                                    self.options.target_pos_node6[car_idx] = (rx, ry)
-                                if self.options.entering_node7[car_idx] == True:
-                                    self.options.target_pos_node7[car_idx] = (px, py)
-                                if self.options.entering_node8[car_idx] == True:
-                                    self.options.target_pos_node8[car_idx] = (lx, ly)
-                            # entering from right side of intersection
-                            if dr == min(dl, dr, ds, dp):
-                                if self.options.entering_node6[car_idx] == True:
-                                    self.options.target_pos_node6[car_idx] = (px, py)
-                                if self.options.entering_node7[car_idx] == True:
-                                    self.options.target_pos_node7[car_idx] = (lx, ly)
-                                if self.options.entering_node8[car_idx] == True:
-                                    self.options.target_pos_node8[car_idx] = (sx, sy)
-                            # entering from bottom side of intersection
-                            if dp == min(dl, dr, ds, dp):
-                                if self.options.entering_node6[car_idx] == True:
-                                    self.options.target_pos_node6[car_idx] = (lx, ly)
-                                if self.options.entering_node7[car_idx] == True:
-                                    self.options.target_pos_node7[car_idx] = (sx, sy)
-                                if self.options.entering_node8[car_idx] == True:
-                                    self.options.target_pos_node8[car_idx] = (rx, ry)
-
-
-
-                # not initialized properly
-                if curr_node is None:
-                    continue
-                else:
-                    self.curr_node = curr_node
-
-                # N1: driving straight
-                # check node1 assign rewards
-                #
-                # What happens if the car doesn't move?
-                if curr_node[car_idx] == drive_straight or self.options.assign_node1[car_idx] == True:
-                    # minx, miny = np.inf, np.inf
-                    # maxx, maxy = -np.inf, -np.inf
-                    # for pos in self.options.pos_node1[car_idx]:
-                    #     minx, miny = min(minx, pos[0]), min(miny, pos[1])
-                    #     maxx, maxy = max(maxx, pos[0]), max(maxy, pos[1])
-                    # movement_dir = 0 if maxx-minx > maxy-miny else 1
-                    # xr, yr = 0, 0
-                    # rect_list = list(self.options.last_rect_node1[car_idx])
-                    # xset, yset = set(), set()
-                    # for rindex in range(len(rect_list)):
-                    #     if not isLaneRect(rect_list[rindex]):
-                    #         continue
-                    #     for pos in rect_list[rindex]:
-                    #         xset.add(pos[0])
-                    #         yset.add(pos[1])
-                    # if movement_dir == 0:
-                    #     target_distance = 0.01 # instead of 0 to avoid handling that bad case of 0/0 division
-                    #     if len(xset) > 0:
-                    #         target_distance = max(xset)-min(xset)
-                    #     covered_distance = 0.0
-                    #     if len(self.options.pos_node1[car_idx]) > 0:
-                    #         covered_distance = maxx-minx
-                    #     step_rewards[car_idx] = ((covered_distance)*5.0)/(target_distance)
-                    # else:
-                    #     target_distance = 0.01 # instead of 0 to avoid handling that bad case of 0/0 division
-                    #     if len(yset) > 0:
-                    #         target_distance = max(yset)-min(yset)
-                    #     covered_distance = 0.0
-                    #     if len(self.options.pos_node1[car_idx]) > 0:
-                    #         covered_distance = maxy-miny
-                    #     step_rewards[car_idx] = ((covered_distance)*5.0)/(target_distance)
-
-                    if len(self.options.pos_node1[car_idx]) > 1:    
-                        # find out displacement in x direction, y direction
-                        last_pt = self.options.pos_node1[car_idx][-1]
-                        second_last_pt = self.options.pos_node1[car_idx][-2]
-                        xdisp, ydisp = last_pt[0]-second_last_pt[0], last_pt[1]-second_last_pt[1]
-                        displacement = b2Vec2(xdisp, ydisp)
-                        # localize last point
-                        rect_list = list(self.options.last_rect_node1[car_idx])
-                        correct_index = -1
-                        for rindex in range(len(rect_list)):
-                            if Polygon(rect_list[rindex]).contains(Point(last_pt[0], last_pt[1])):
-                                correct_index = rindex
-                                break
-                        if correct_index != -1:
-                            xset, yset = set(), set()
-                            for pt in rect_list[rindex]:
-                                xset.add(pt[0])
-                                yset.add(pt[1])
-                            xr, yr = max(xset)-min(xset), max(yset)-min(yset)
-                            movement_dir = 0 if yr == LANE_WIDTH else 1
-                            if self.infos[car_idx]['speed'] >= 10:
-                                if movement_dir == 0:
-                                    if self.options.direction_node1[car_idx] is None:
-                                        possible_dir = b2Vec2((1, 0))
-                                        veh_pointing = self.cars[car_idx].get_acc_direction()
-                                        dot_prod = b2Dot(possible_dir, veh_pointing)
-                                        if dot_prod > 0: # (1, 0) is the right direction
-                                            self.options.direction_node1[car_idx] = possible_dir
-                                        else:
-                                            self.options.direction_node1[car_idx] = b2Vec2((-1, 0))
-                                    else:
-                                        correct_direction = self.options.direction_node1[car_idx]
-                                        dot_value = b2Dot(displacement, correct_direction)
-                                        step_rewards[car_idx] = 1.0*np.abs(dot_value)/(xr)
-                                        multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
-                                        step_rewards[car_idx] *= multiplier
-                                else:
-                                    if self.options.direction_node1[car_idx] is None:
-                                        possible_dir = b2Vec2((0, 1))
-                                        veh_pointing = self.cars[car_idx].get_acc_direction()
-                                        dot_prod = b2Dot(possible_dir, veh_pointing)
-                                        if dot_prod > 0: # (0, 1) is the right direction
-                                            self.options.direction_node1[car_idx] = possible_dir
-                                        else:
-                                            self.options.direction_node1[car_idx] = b2Vec2((0, -1))
-                                    else:
-                                        correct_direction = self.options.direction_node1[car_idx]
-                                        dot_value = b2Dot(displacement, correct_direction)
-                                        step_rewards[car_idx] = 1.0*np.abs(dot_value)/(yr)
-                                        multiplier = 1 if dot_value > 0 and self.infos[car_idx]['lane_localization'] == "right" else -5
-                                        step_rewards[car_idx] *= multiplier
-
-                    # if entering node9, penalize
-                    if self.options.entering_node9[car_idx] == True:
-                        step_rewards[car_idx] -= 3
-
-                # N2: decel to stop
-                elif self.options.assign_node2[car_idx] == True:
-                    v2s = self.options.start_vel_node2[car_idx]
-                    v2e = self.options.end_vel_node2[car_idx]
-                    step_rewards[car_idx] = (v2s-v2e)
-
-                # N3: stop
-                elif self.options.assign_node3[car_idx] == True:
-                    step_rewards[car_idx] = self.options.num_brakes_node3[car_idx]
-
-                # N4: stop
-                elif self.options.assign_node4[car_idx] == True:
-                    step_rewards[car_idx] = self.options.num_brakes_node4[car_idx]
-
-                # N5: stop
-                elif self.options.assign_node5[car_idx] == True:
-                    step_rewards[car_idx] = self.options.num_brakes_node5[car_idx]
-
-                # N6: turn left
-                elif self.options.assign_node6[car_idx] == True:
-                    if self.cars[car_idx] and self.cars[car_idx].hull:
-                        x, y = self.cars[car_idx].hull.position
-                        eps = LANE_WIDTH//2
-                        tx, ty = self.options.target_pos_node6[car_idx]
-                        if dist(x, y, tx, ty) <= eps:
-                            step_rewards[car_idx] = 3
-                        else:
-                            step_rewards[car_idx] = -3
-
-                # N7: move straight
-                elif self.options.assign_node7[car_idx] == True:
-                    if self.cars[car_idx] and self.cars[car_idx].hull:
-                        x, y = self.cars[car_idx].hull.position
-                        eps = LANE_WIDTH//2
-                        tx, ty = self.options.target_pos_node7[car_idx]
-                        if dist(x, y, tx, ty) <= eps:
-                            step_rewards[car_idx] = 3
-                        else:
-                            step_rewards[car_idx] = -3
-
-                # N8: turn right
-                elif self.options.assign_node8[car_idx] == True:
-                    if self.cars[car_idx] and self.cars[car_idx].hull:
-                        x, y = self.cars[car_idx].hull.position
-                        eps = LANE_WIDTH//2
-                        tx, ty = self.options.target_pos_node8[car_idx]
-                        if dist(x, y, tx, ty) <= eps:
-                            step_rewards[car_idx] = 3
-                        else:
-                            step_rewards[car_idx] = -3
-
-                elif curr_node[car_idx] == off_road:
-                    step_rewards[car_idx] = -10
-
                 
                 # We actually don't want to count fuel spent, we want car to be faster.
                 ## self.rewards[car_idx] -=  10 * self.cars[car_idx].fuel_spent / ENGINE_POWER
                 self.cars[car_idx].fuel_spent = 0.0
                 
-                # Calculate this step's reward
-                # step_rewards[car_idx] = self.rewards[car_idx] - self.prev_rewards[car_idx]
-                # self.prev_rewards[car_idx] = self.rewards[car_idx]
-
-                # If this car gets off playfield then huge negative reward and say its done
+                # If this car gets off playfield
                 x, y = self.cars[car_idx].hull.position
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                     done_values[car_idx] = True
-                    step_rewards[car_idx] = -100
 
         for car_idx in range(NUM_VEHICLES):
             self.tot_reward[car_idx] += step_rewards[car_idx]
+
         return self.states, step_rewards, done_values, self.infos
 
     # Determine if the car is offroad or onroad
@@ -762,10 +532,6 @@ class CarGridDriving(gym.Env):
         horiz_ind(20, -10.0*self.cars[car_idx].wheels[0].joint.angle, (0,1,0))
         horiz_ind(30, -0.8*self.cars[car_idx].hull.angularVelocity, (1,0,0))
         gl.glEnd()
-        if self.curr_node is not None:
-            self.score_labels[car_idx].text = "%.3f, %s, %.2f [%s]" % (self.tot_reward[car_idx], self.loc[car_idx], true_speed, self.options.HUMAN_NAMES[self.curr_node[car_idx]])
-        else:
-            self.score_labels[car_idx].text = "%.3f, %s, %.2f" % (self.tot_reward[car_idx], self.loc[car_idx], true_speed)
         self.score_labels[car_idx].draw()
 
 if __name__=="__main__":

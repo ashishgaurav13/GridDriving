@@ -164,7 +164,19 @@ def translate(pt, xs, ys, angle=0):
 	)
 	return pt
 
-def rotate(pt, angle): return 
+def extended_rect(x1, x2, y1, y2, xpoints=2, ypoints=2):
+	if x1 == 0 and x2 > 2*lane_w:
+		return rect(x1, 2*lane_w, y1, y2, xpoints=xpoints, ypoints=ypoints)+\
+			rect(2*lane_w, x2, y1, y2, xpoints=xpoints, ypoints=ypoints)
+	if x1 < -2*lane_w and x2 == 0:
+		return rect(x1, -2*lane_w, y1, y2, xpoints=xpoints, ypoints=ypoints)+\
+			rect(-2*lane_w, x2, y1, y2, xpoints=xpoints, ypoints=ypoints)
+	if y1 == 0 and y2 > 2*lane_w:
+		return rect(x1, x2, y1, 2*lane_w, xpoints=xpoints, ypoints=ypoints)+\
+			rect(x1, x2, 2*lane_w, y2, xpoints=xpoints, ypoints=ypoints)
+	if y1 < -2*lane_w and y2 == 0:
+		return rect(x1, x2, y1, -2*lane_w, xpoints=xpoints, ypoints=ypoints)+\
+			rect(x1, x2, -2*lane_w, y2, xpoints=xpoints, ypoints=ypoints)
 
 def rect(x1, x2, y1, y2, xpoints=2, ypoints=2):
 	rects = []
@@ -310,6 +322,7 @@ def inner_arc(x1, x2, y1, y2, dx, dy, r, A, B, num_points=3):
 def construct_polygons(point_info, lane_w, d):
 	neighbors = list(point_info[1:5])
 	polygons = []
+	special_rectangles = [] # these are basically parts of junctions
 	# For each rectangle provide which direction is considered as
 	# going right
 	if sum(neighbors) == 1:
