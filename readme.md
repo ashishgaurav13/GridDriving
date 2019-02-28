@@ -21,11 +21,9 @@ The simulator can be started with n vehicles, and for every step of this environ
 - Generalized to n vehicles, each vehicle viewer only sees relevant information
 - Localization information
 
-### Things to do
+### Experiments
 
-- [ ] Update for sparse rewards
-- [ ] Train on options graph
-- [ ] Update documentation in code
+The plan is to use this with [Wise-Move](https://git.uwaterloo.ca/wise-lab/wise-move) for hierarchical reinforcement learning experiments.
 
 ### License
 
