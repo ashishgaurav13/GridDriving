@@ -20,7 +20,7 @@ import pyglet
 from pyglet import gl
 from constants import *
 
-class CarGridDriving(gym.Env):
+class GridDriving(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array', 'state_pixels'],
         'video.frames_per_second' : FPS
@@ -549,7 +549,7 @@ if __name__=="__main__":
         if k==key.RIGHT and actions[car_idx][0]==+1.0: actions[car_idx][0] = 0
         if k==key.UP:    actions[car_idx][1] = 0
         if k==key.DOWN:  actions[car_idx][2] = 0
-    env = CarGridDriving()
+    env = GridDriving()
 
     # Render a viewer for each car
     for car_idx in range(NUM_VEHICLES):

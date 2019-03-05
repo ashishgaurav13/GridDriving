@@ -1,4 +1,4 @@
-## CarGridDriving
+## GridDriving
 
 <img src="images/circuit.png" width=300/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img src="images/closeup.png" width=300/>
 
@@ -23,7 +23,7 @@ The simulator can be started with n vehicles, and for every step of this environ
 
 ### Experiments
 
-The plan is to use this with [Wise-Move](https://git.uwaterloo.ca/wise-lab/wise-move) for hierarchical reinforcement learning experiments.
+The plan is to use this with [Wise-Move](https://git.uwaterloo.ca/wise-lab/wise-move) for hierarchical reinforcement learning experiments. To see an example run, just run the `grid_driving.py` file with no arguments.
 
 ### License
 

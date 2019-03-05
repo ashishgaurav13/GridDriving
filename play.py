@@ -1,4 +1,4 @@
-from car_grid_driving import CarGridDriving
+from grid_driving import GridDriving
 import numpy as np
 import random
 import argparse
@@ -23,7 +23,7 @@ np.set_printoptions(suppress=True)
 initTf(tf, K)
 
 # Create Env
-env = CarGridDriving()
+env = GridDriving()
 
 # map integer keypress to action
 def key_press(k):
