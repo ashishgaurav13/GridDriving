@@ -2,6 +2,27 @@
 
 <img src="images/circuit.png" width=300/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img src="images/closeup.png" width=300/>
 
+### Information per timestep
+
+If there are N cars overall, they are assigned indices 0, 1, ... N-1. The `info` looks like:
+
+```json
+{
+	"0": {
+		"traffic_light": True/False,
+		"lane_localization": "left/right/off-road/junction",
+		"on_rect": True/False,
+		"off_road": True/False,
+		"junction": True/False,
+		"type_intersection": 3/4,
+		"only_turn": True/False,
+		"speed": ...,
+		"pos": ...
+	}, ...
+}
+
+```
+
 ### Graph Construction
 
 This simulator is an extension of the OpenAI Gym [CarRacing-v0](https://gym.openai.com/envs/CarRacing-v0/) environment. The original environment constructs a heavily morphed circlular track and the goal is to loop around on this track. The simulator used in this project extends this environment by constructing a (h, w) grid, where each edge appears with probability p.
