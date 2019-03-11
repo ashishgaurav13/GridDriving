@@ -123,10 +123,8 @@ class GridDriving(gym.Env):
             t.direction = self.directions[i]
 
             # Assign colors
-            if t.direction == 'n':
-                c = 0.2# *(i%3)
-            else:
-                c = 0.01# *(i%3)
+            # USEFUL: Change colors when debugging directions!
+            c = 0.01*(i%3)
             i += 1
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
             
@@ -289,7 +287,7 @@ class GridDriving(gym.Env):
             self.infos[car_idx]['off_road'] = self.loc[car_idx] == 'off-road'
             self.infos[car_idx]['junction'] = self.loc[car_idx] == 'junction'
             self.infos[car_idx]['type_intersection'] = values[1]
-            self.infos[car_idx]['only_turn'] = values[2]
+            self.infos[car_idx]['only_turn'] = values[2] if self.loc[car_idx] == 'right' else None
             self.infos[car_idx]['speed'] = speed
             self.infos[car_idx]['pos'] = pos
             self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
