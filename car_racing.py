@@ -8,11 +8,12 @@ from Box2D.b2 import revoluteJointDef, contactListener
 
 import gym
 from gym import spaces
-from car_dynamics import Car
 from gym.utils import colorize, seeding
 
 import pyglet
 from pyglet import gl
+
+from . import Car
 
 # Initially created by Oleg Klimov.
 # Licensed on the same terms as the rest of OpenAI Gym.

@@ -6,19 +6,20 @@ from Box2D import b2Vec2, b2Dot
 from Box2D.b2 import edgeShape, circleShape
 from Box2D.b2 import fixtureDef, polygonShape
 from Box2D.b2 import revoluteJointDef
-from friction_detector import FrictionDetector
 
 import gym
 from gym.envs.classic_control import rendering
-from car_dynamics import Car
 from gym.utils import colorize
-from grid_utils import *
-from env_utils import *
-from localization import *
 
 import pyglet
 from pyglet import gl
+
 from constants import *
+from env_utils import *
+from friction_detector import FrictionDetector
+from grid_utils import *
+from localization import *
+from car_dynamics import Car
 
 class GridDriving(gym.Env):
     metadata = {
@@ -311,7 +312,13 @@ class GridDriving(gym.Env):
         return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
             self.cars[car_idx].hull.position)
 
-    def render(self, car_idx, mode='human'):
+    def render(self, car_idx=None, mode='human'):
+
+        # If car_idx = None, then all cars should be shown in different windows
+        if car_idx is None:
+            for i in range(NUM_VEHICLES):
+                self.render(i, mode)
+            return
 
         # Make the transforms and score labels if needed
         if "score_labels" not in self.__dict__:
@@ -533,60 +540,3 @@ class GridDriving(gym.Env):
         horiz_ind(30, -0.8*self.cars[car_idx].hull.angularVelocity, (1,0,0))
         gl.glEnd()
         self.score_labels[car_idx].draw()
-
-if __name__=="__main__":
-    from pyglet.window import key
-    actions = [np.array( [0.0, 0.0, 0.0] ) for i in range(NUM_VEHICLES)]
-    def key_press(k, mod, car_idx):
-        global restart
-        if k==0xff0d: restart = True
-        if k==key.LEFT:  actions[car_idx][0] = -1.0
-        if k==key.RIGHT: actions[car_idx][0] = +1.0
-        if k==key.UP:    actions[car_idx][1] = +1.0
-        if k==key.DOWN:  actions[car_idx][2] = +0.8   # set 1.0 for wheels to block to zero rotation
-    def key_release(k, mod, car_idx):
-        if k==key.LEFT  and actions[car_idx][0]==-1.0: actions[car_idx][0] = 0
-        if k==key.RIGHT and actions[car_idx][0]==+1.0: actions[car_idx][0] = 0
-        if k==key.UP:    actions[car_idx][1] = 0
-        if k==key.DOWN:  actions[car_idx][2] = 0
-    env = GridDriving()
-
-    # Render a viewer for each car
-    for car_idx in range(NUM_VEHICLES):
-        env.render(car_idx=car_idx)
-    
-    # Let's hook key presses and releases to all viewers (TODO: this is a test)
-    for car_idx in range(NUM_VEHICLES):
-        env.viewers[car_idx].window.on_key_press = lambda k, mod: key_press(k, mod, car_idx)
-        env.viewers[car_idx].window.on_key_release = lambda k, mod: key_release(k, mod, car_idx)
-    
-    # Loop on
-    while True:
-        env.reset()
-        total_rewards = np.array(make_n_rewards(NUM_VEHICLES))
-        steps = 0
-        restart = False
-        while True:
-            states, rewards, done_values, info = env.step(actions)
-            total_rewards += np.array(rewards)
-            
-            # TODO: figure out done values
-            if steps % 200 == 0:
-                print('alive')
-                # print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
-                # print("step {} total_reward {:+0.2f}".format(steps, total_reward))
-                #import matplotlib.pyplot as plt
-                #plt.imshow(s)
-                #plt.savefig("test.jpeg")
-        
-            steps += 1
-        
-            # Render a viewer for each car
-            for car_idx in range(NUM_VEHICLES):
-                _, _ = env.render(car_idx=car_idx)
-
-            # if done or restart: break
-
-    # End simulation
-    env.close()
-
