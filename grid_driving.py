@@ -98,8 +98,13 @@ class GridDriving(gym.Env):
         # Create polygons for the lattice road pieces and lane separators
         # Also store directions for each of the road piece
         if "track" not in self.__dict__:
-            self.track, self.ls_polygons, self.directions, self.relevant_nodes = \
+            self.normal_polygons, self.special_polygons, self.ls_polygons, self.directions, \
+            self.relevant_nodes, self.special_relevant_nodes = \
                 construct_grid(self.lattice, LANE_WIDTH, EDGE_WIDTH, self.off_params, LANE_SEP)
+            self.track = self.normal_polygons+self.special_polygons
+            self.directions += "n"*len(self.special_polygons) # Each special_polygon is junction
+            self.relevant_nodes += self.special_relevant_nodes
+            assert(len(self.track) == len(self.directions) == len(self.relevant_nodes))
 
         # Start with a blank list of road objects
         self.road = []
@@ -118,7 +123,10 @@ class GridDriving(gym.Env):
             t.direction = self.directions[i]
 
             # Assign colors
-            c = 0.01*(i%3)
+            if t.direction == 'n':
+                c = 0.2# *(i%3)
+            else:
+                c = 0.01# *(i%3)
             i += 1
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
             
