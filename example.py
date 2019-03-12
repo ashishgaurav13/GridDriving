@@ -7,7 +7,12 @@ from env_utils import *
 from pyglet.window import key
 
 # Example file on how to use the environment
-env = GridDriving()
+
+# Example lattice
+env = GridDriving([
+    [1, 1], 
+    [1, 1]
+])
 
 # actions
 actions = [np.array( [0.0, 0.0, 0.0] ) for i in range(NUM_VEHICLES)]

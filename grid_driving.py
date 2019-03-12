@@ -27,8 +27,10 @@ class GridDriving(gym.Env):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self):
+    def __init__(self, pre_provided_lattice=None):
         
+        self.pre_provided_lattice = pre_provided_lattice
+
         # Init seed for randomness
         seed(self)
         
@@ -93,7 +95,7 @@ class GridDriving(gym.Env):
         # lattice constraints are met
         if "lattice" not in self.__dict__:
             self.lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE,
-                LATTICE_CONSTRAINTS, RANDOM_DELETIONS)
+                LATTICE_CONSTRAINTS, RANDOM_DELETIONS, self.pre_provided_lattice)
 
         # Create polygons for the lattice road pieces and lane separators
         # Also store directions for each of the road piece
@@ -138,7 +140,7 @@ class GridDriving(gym.Env):
             self.road.append(t)
 
         # Which vertices are in the lattice?
-        h, w = GRID_ROWS, GRID_COLS
+        h, w = self.lattice.shape[:2]
         self.which_points = []
         self.neighbors = []
         for i in range(h):

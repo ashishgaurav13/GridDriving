@@ -43,16 +43,32 @@ def BFS(lattice, edges=None):
 # Lattice constraints have min max values for 5 types of junctions.
 #
 # After constructing the lattice, do random deletions until those conditions are met.
-def construct_lattice(h, w, p, lattice_constraints, num_deletions):
+def construct_lattice(h, w, p, lattice_constraints, num_deletions, pre_provided_lattice=None):
+
+	if pre_provided_lattice != None:
+		pre_provided_lattice = np.array(pre_provided_lattice, dtype=bool)
+		assert(len(pre_provided_lattice.shape) == 2)
+		h, w = pre_provided_lattice.shape
+
 	lattice = np.zeros(shape=(h, w, 5), dtype=bool)
 	counts_loop = 0
 	while True:
 		counts_loop += 1
+
 		for i in range(h):
 			for j in range(w):
-				lattice[i][j][0] = bool(np.random.choice(2, 1, p=[1-p, p])[0])
+				if pre_provided_lattice is not None:
+					lattice[i][j][0] = pre_provided_lattice[i][j]
+				else:
+					lattice[i][j][0] = bool(np.random.choice(2, 1, p=[1-p, p])[0])
+
 		is_connected = BFS(lattice[:, :, 0])
-		if not is_connected: continue
+		if not is_connected:
+			if pre_provided_lattice is not None:
+				print("Provided lattice isn't valid!")
+				exit(0)
+			continue
+
 		edges = []
 		for i in range(h):
 			for j in range(w):
@@ -72,15 +88,20 @@ def construct_lattice(h, w, p, lattice_constraints, num_deletions):
 				if j-1 >= 0:
 					lattice[i][j-1][2] = lattice[i][j][0]
 					if (i, j, i, j-1, 4) not in edges: edges.append((i, j-1, i, j, 2))
+
+		if pre_provided_lattice is not None: break
+
 		# check constraints before random deletions
 		is_satisfied = check_constraints(lattice, lattice_constraints)
 		if not is_satisfied: continue
+
 		# random deletions; it is possible to loop forever if the graph cannot satisfy lattice
 		# constraints ever, after deleting the required number of edges
 		lattice, success = do_random_deletions(lattice, np.array(edges), num_deletions, lattice_constraints)
 		if not success: continue
 		else: break
-	print('Took %d iterations to generate track' % counts_loop)
+
+	if pre_provided_lattice is None: print('Took %d iterations to generate track' % counts_loop)
 	return lattice
 
 # Do random deletions, given number of deletions
