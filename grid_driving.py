@@ -27,9 +27,9 @@ class GridDriving(gym.Env):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, pre_provided_lattice=None):
+    def __init__(self, structure=None):
         
-        self.pre_provided_lattice = pre_provided_lattice
+        self.pre_provided_lattice = structure
 
         # Init seed for randomness
         seed(self)
