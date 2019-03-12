@@ -23,6 +23,19 @@ If there are N cars overall, they are assigned indices 0, 1, ... N-1. The `info`
 
 ```
 
+See `example.py` for an example of how to use this environment in RL settings.
+
+### Specifying Lattices Manually
+
+While the environment can be created without arguments, it also accepts an argument with a lattice:
+
+```python
+env = GridDriving([
+    [1, 1], 
+    [1, 1]
+])
+```
+
 ### Graph Construction
 
 This simulator is an extension of the OpenAI Gym [CarRacing-v0](https://gym.openai.com/envs/CarRacing-v0/) environment. The original environment constructs a heavily morphed circlular track and the goal is to loop around on this track. The simulator used in this project extends this environment by constructing a (h, w) grid, where each edge appears with probability p.
