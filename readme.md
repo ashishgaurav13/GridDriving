@@ -9,16 +9,16 @@ If there are N cars overall, they are assigned indices 0, 1, ... N-1. The `info`
 ```json
 {
 	"0": {
-		"traffic_light": True/False,
-		"lane_localization": "left/right/off-road/junction",
-		"on_rect": True/False,
-		"off_road": True/False,
-		"junction": True/False,
-		"type_intersection": 3/4,
-		"only_turn": True/False,
-		"speed": ...,
-		"pos": ...
-	}, ...
+		"traffic_light": "True OR False",
+		"lane_localization": "left OR right OR off-road OR junction",
+		"on_rect": "True OR False",
+		"off_road": "True OR False",
+		"junction": "True OR False",
+		"type_intersection": "3 OR 4",
+		"only_turn": "True OR False",
+		"speed": "...",
+		"pos": "...",
+	},
 }
 
 ```
