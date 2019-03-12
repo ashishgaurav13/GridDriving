@@ -13,6 +13,7 @@ from gym.utils import colorize
 
 import pyglet
 from pyglet import gl
+from pyglet.window import key
 
 from constants import *
 from env_utils import *
@@ -27,9 +28,30 @@ class GridDriving(gym.Env):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, structure=None):
+    # For play mode
+    def key_press(self, k, mod, car_idx):
+        if k==key.LEFT:  self.extra_actions[car_idx][0] = -1.0
+        if k==key.RIGHT: self.extra_actions[car_idx][0] = +1.0
+        if k==key.UP:    self.extra_actions[car_idx][1] = +1.0
+        if k==key.DOWN:  self.extra_actions[car_idx][2] = +0.8   # set 1.0 for wheels to block to zero rotation
+
+    # For play mode
+    def key_release(self, k, mod, car_idx):
+        if k==key.LEFT  and self.extra_actions[car_idx][0]==-1.0: self.extra_actions[car_idx][0] = 0
+        if k==key.RIGHT and self.extra_actions[car_idx][0]==+1.0: self.extra_actions[car_idx][0] = 0
+        if k==key.UP:    self.extra_actions[car_idx][1] = 0
+        if k==key.DOWN: self.extra_actions[car_idx][2] = 0
+
+    def __init__(self, structure=None, play_mode=False, play_mode_idx=0):
         
+        assert(NUM_VEHICLES > 0)
         self.pre_provided_lattice = structure
+        self.play_mode = play_mode
+        assert(play_mode_idx in range(NUM_VEHICLES))
+        self.play_mode_car_idx = play_mode_idx
+
+        if self.play_mode:
+            self.extra_actions = [np.array( [0.0, 0.0, 0.0] ) for i in range(NUM_VEHICLES)]
 
         # Init seed for randomness
         seed(self)
@@ -202,6 +224,11 @@ class GridDriving(gym.Env):
     # actions is a list of NUM_VEHICLES actions
     # assign_rewards tells whether the car needs a sparse reward or not
     def step(self, actions):
+
+        if self.play_mode:
+            for car_idx in range(NUM_VEHICLES):
+                if actions[car_idx] is not None and car_idx == self.play_mode_car_idx:
+                    actions[car_idx] += self.extra_actions[car_idx]
 
         # apply the action to the available vehicles and step
         for car_idx, action in enumerate(actions):
@@ -461,6 +488,14 @@ class GridDriving(gym.Env):
         # Do the actual rendering using pyglet.gl
         arr = None
         win = self.viewers[car_idx].window
+
+        # If play mode, then assign key press and key release events
+        if self.play_mode:
+            if car_idx == self.play_mode_car_idx:
+                win.on_key_press = lambda k, mod: self.key_press(k, mod, car_idx)
+                win.on_key_release = lambda k, mod: self.key_release(k, mod, car_idx)
+
+
         if mode != 'state_pixels':
             win.switch_to()
             win.dispatch_events()
