@@ -43,7 +43,7 @@ def BFS(lattice, edges=None):
 # Lattice constraints have min max values for 5 types of junctions.
 #
 # After constructing the lattice, do random deletions until those conditions are met.
-def construct_lattice(h, w, p, lattice_constraints, num_deletions, pre_provided_lattice=None):
+def construct_lattice(h, w, p, lattice_constraints, num_deletions, pre_provided_lattice=None, delete_edges=None):
 
 	if pre_provided_lattice != None:
 		pre_provided_lattice = np.array(pre_provided_lattice, dtype=bool)
@@ -89,7 +89,18 @@ def construct_lattice(h, w, p, lattice_constraints, num_deletions, pre_provided_
 					lattice[i][j-1][2] = lattice[i][j][0]
 					if (i, j, i, j-1, 4) not in edges: edges.append((i, j-1, i, j, 2))
 
-		if pre_provided_lattice is not None: break
+		if pre_provided_lattice is not None:
+			if delete_edges is not None:
+				for edge in delete_edges:
+					a, b, c, d = edge
+					assert(0 <= a < h and 0 <= b < w and 0 <= c < h and 0 <= d < w, "invalid edge: %s" % str(edge))
+					if a+1 == c: ntype, otype = 1, 3
+					if b-1 == d: ntype, otype = 4, 2
+					if a-1 == c: ntype, otype = 3, 1
+					if b+1 == d: ntype, otype = 2, 4
+					lattice[a][b][ntype] = False
+					lattice[c][d][otype] = False
+			break
 
 		# check constraints before random deletions
 		is_satisfied = check_constraints(lattice, lattice_constraints)

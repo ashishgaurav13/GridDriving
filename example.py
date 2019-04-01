@@ -11,6 +11,7 @@ from pyglet.window import key
 # Example lattice
 env = GridDriving([
     [1, 1], 
+    [1, 1],
     [1, 1]
 ])
 

@@ -42,11 +42,15 @@ class GridDriving(gym.Env):
         if k==key.UP:    self.extra_actions[car_idx][1] = 0
         if k==key.DOWN: self.extra_actions[car_idx][2] = 0
 
-    def __init__(self, structure=None, play_mode=False, play_mode_idx=0):
+    def __init__(self, structure=None, structure_exclude=None, init_pos=None, finish_pos=None, play_mode=False, play_mode_idx=0):
         
         assert(NUM_VEHICLES > 0)
         self.pre_provided_lattice = structure
+        self.delete_edges = structure_exclude
         self.play_mode = play_mode
+        self.init_pos = init_pos
+        self.finish_pos = finish_pos
+        self.dist_eps = 20.0
         assert(play_mode_idx in range(NUM_VEHICLES))
         self.play_mode_car_idx = play_mode_idx
 
@@ -118,7 +122,7 @@ class GridDriving(gym.Env):
         # lattice constraints are met
         if "lattice" not in self.__dict__:
             self.lattice = construct_lattice(GRID_ROWS, GRID_COLS, PROB_EDGE,
-                LATTICE_CONSTRAINTS, RANDOM_DELETIONS, self.pre_provided_lattice)
+                LATTICE_CONSTRAINTS, RANDOM_DELETIONS, self.pre_provided_lattice, self.delete_edges)
 
         # Create polygons for the lattice road pieces and lane separators
         # Also store directions for each of the road piece
@@ -202,23 +206,33 @@ class GridDriving(gym.Env):
             print("retry to generate track (normal if there are not many of this messages)")
         
         # randomly init each car
-        rect_poly_indices = [i for i in range(len(self.directions)) if self.directions[i] in "lrtb"]
-        random_choices = np.random.choice(rect_poly_indices, NUM_VEHICLES, replace=False)
-        for car_idx, rid in enumerate(random_choices):
-            rect_poly = np.array(self.road_poly[rid][0])
-            direction = self.directions[rid]
-            x = np.mean(rect_poly[:, 0])
-            y = np.mean(rect_poly[:, 1])
-            if direction == "r":
-                angle = -90
-            elif direction == "t":
-                angle = 0
-            elif direction == "l":
-                angle = 90
-            else:
-                angle = 180
-            self.cars[car_idx] = Car(self.world, angle*math.pi/180.0, x, y)
-            
+        if not self.init_pos:
+            rect_poly_indices = [i for i in range(len(self.directions)) if self.directions[i] in "lrtb"]
+            random_choices = np.random.choice(rect_poly_indices, NUM_VEHICLES, replace=False)
+            for car_idx, rid in enumerate(random_choices):
+                rect_poly = np.array(self.road_poly[rid][0])
+                direction = self.directions[rid]
+                x = np.mean(rect_poly[:, 0])
+                y = np.mean(rect_poly[:, 1])
+                if direction == "r":
+                    angle = -90
+                elif direction == "t":
+                    angle = 0
+                elif direction == "l":
+                    angle = 90
+                else:
+                    angle = 180
+                self.cars[car_idx] = Car(self.world, angle*math.pi/180.0, x, y)
+        else:
+            for car_idx, init_p in enumerate(self.init_pos):
+                i, j, angle = init_p
+                i -= 0.5
+                j += 0.5
+                x, y = i*EDGE_WIDTH, j*EDGE_WIDTH
+                x += self.off_params[0]
+                y += self.off_params[1]
+                self.cars[car_idx] = Car(self.world, angle*math.pi/180.0, x, y)
+
         # return states after init
         return self.step([None for i in range(NUM_VEHICLES)])[0]
         
@@ -254,8 +268,6 @@ class GridDriving(gym.Env):
         for car_idx in range(NUM_VEHICLES):
             on_road, pid = self.determine_onroad(car_idx)
             self.last_pid[car_idx] = pid
-            if self.directions[pid] in ["l", "r", "t", "b"]:
-                self.last_rect_pid[car_idx] = pid
             if on_road:
                 self.last_tile_direction[car_idx] = self.directions[pid]
                 # Also update last relevant node
@@ -263,6 +275,8 @@ class GridDriving(gym.Env):
             else:
                 self.loc[car_idx] = "off-road"
                 continue
+            if self.directions[pid] in ["l", "r", "t", "b"]:
+                self.last_rect_pid[car_idx] = pid
             if self.last_tile_direction[car_idx] == None:
                 continue
             vx, vy = self.cars[car_idx].hull.linearVelocity
@@ -336,6 +350,19 @@ class GridDriving(gym.Env):
                 
                 # If this car gets off playfield
                 x, y = self.cars[car_idx].hull.position
+
+                # Or if close to finish coordinates
+                if self.finish_pos:
+                    i, j = self.finish_pos[car_idx]
+                    i -= 0.5
+                    j += 0.5
+                    fx, fy = i*EDGE_WIDTH, j*EDGE_WIDTH
+                    fx += self.off_params[0]
+                    fy += self.off_params[1]
+                    dist = ((fx-x)**2+(fy-y)**2)**0.5
+                    if dist < self.dist_eps:
+                        done_values[car_idx] = True
+
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                     done_values[car_idx] = True
 
@@ -452,11 +479,11 @@ class GridDriving(gym.Env):
                         self.viewers[car_idx].draw_polygon(light_polygons[1], color=TRAFFIC_LIGHT_INNER_COLOR)
 
         # Get the only possible turn at this junction
-        rni, rnj = self.last_relevant_node[car_idx]
-        neighbor_info = list(self.lattice[rni, rnj, 1:])
         my_last_rect_pid = self.last_rect_pid[car_idx]
         only_turn = None
         if my_last_rect_pid and my_last_rect_pid != -1:
+            rni, rnj = self.last_relevant_node[car_idx]
+            neighbor_info = list(self.lattice[rni, rnj, 1:])
             my_dir_last = self.directions[my_last_rect_pid]
             if np.sum(neighbor_info) == 2:
                 if neighbor_info == [False, False, True, True]:
