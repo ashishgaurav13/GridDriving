@@ -24,7 +24,7 @@ PLAYFIELD   = 800        # Game over boundary
 FPS         = 50
 ZOOM        = 3          # Camera zoom
 ZOOM_FOLLOW = False      # Set to False for fixed view (don't use zoom)
-SCALE       = 1.0
+SCALE       = 1.5
 
 LANE_WIDTH = 12
 LANE_SEP = 1

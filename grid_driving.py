@@ -86,6 +86,7 @@ class GridDriving(gym.Env):
         # TODO: decide how to use this reward
         self.rewards = make_n_rewards(NUM_VEHICLES)
         self.prev_rewards = make_n_rewards(NUM_VEHICLES)
+        self.infos = [None for i in range(NUM_VEHICLES)]
 
         # action space has steer (-1, 0, 1), gas (0, 1), brake (0, 1)
         self.action_spaces = make_n_action_spaces(NUM_VEHICLES)
@@ -303,13 +304,13 @@ class GridDriving(gym.Env):
             'speed': None,
             'pos': None,
         }
-        self.infos = [dict(empty_dict) for i in range(NUM_VEHICLES)]
         for car_idx in range(NUM_VEHICLES):
             rstate, values = self.render(mode="state_pixels", car_idx=car_idx)
             self.states.append(rstate) # TODO
             pos = self.cars[car_idx].hull.position
             vel = self.cars[car_idx].hull.linearVelocity
             speed = np.sqrt(vel[0]**2+vel[1]**2)
+            self.infos[car_idx] = dict(empty_dict)
             self.infos[car_idx]['traffic_light'] = values[0]
             self.infos[car_idx]['lane_localization'] = self.loc[car_idx]
             self.infos[car_idx]['on_rect'] = self.loc[car_idx] in ['left', 'right']
@@ -317,8 +318,9 @@ class GridDriving(gym.Env):
             self.infos[car_idx]['junction'] = self.loc[car_idx] == 'junction'
             self.infos[car_idx]['type_intersection'] = values[1]
             self.infos[car_idx]['only_turn'] = values[2] if self.loc[car_idx] == 'right' else None
+            self.infos[car_idx]['junction_pos'] = values[3]
             self.infos[car_idx]['speed'] = speed
-            self.infos[car_idx]['pos'] = pos
+            self.infos[car_idx]['pos'] = (pos.x, pos.y)
             self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
 
         # Reward Assignment (sparse)
@@ -418,15 +420,16 @@ class GridDriving(gym.Env):
         # 3. Show just that
         showed_traffic_light = None
         count_lights = None
+        shift_pos = None
         if self.last_pid[car_idx] != -1:
             relevant_node = self.last_relevant_node[car_idx]
             classification_val = self.loc[car_idx] == "right"
+            shift_pos = self.off_params
+            shift_pos = (
+                shift_pos[1]+relevant_node[1]*EDGE_WIDTH,
+                shift_pos[0]+relevant_node[0]*EDGE_WIDTH
+            )
             if classification_val:
-                shift_pos = self.off_params
-                shift_pos = (
-                    shift_pos[1]+relevant_node[1]*EDGE_WIDTH,
-                    shift_pos[0]+relevant_node[0]*EDGE_WIDTH
-                )
                 i = -1
                 if relevant_node in self.which_points:
                     i = self.which_points.index(relevant_node)
@@ -511,10 +514,11 @@ class GridDriving(gym.Env):
             gl.glViewport(0, 0, VP_W, VP_H)
             t.enable()
             self.render_road()
+            self.show_risk()
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
             t.disable()
-            self.render_indicators(WINDOW_W, WINDOW_H, car_idx=car_idx)  # TODO: find why 2x needed
+            # self.render_indicators(WINDOW_W, WINDOW_H, car_idx=car_idx)  # TODO: find why 2x needed
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
             # image_data.save('tmp%d.png'%car_idx)
             arr = np.frombuffer(image_data.data, dtype=np.uint8)
@@ -532,14 +536,15 @@ class GridDriving(gym.Env):
             gl.glViewport(0, 0, WINDOW_W, WINDOW_H)
             t.enable()
             self.render_road()
+            self.show_risk()
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
             t.disable()
-            self.render_indicators(WINDOW_W, WINDOW_H, car_idx=car_idx)
+            # self.render_indicators(WINDOW_W, WINDOW_H, car_idx=car_idx)
             win.flip()
 
         self.viewers[car_idx].onetime_geoms = []
-        return arr, [showed_traffic_light, count_lights if count_lights else None, only_turn]
+        return arr, [showed_traffic_light, count_lights if count_lights else None, only_turn, shift_pos]
 
     # Close all viewers
     def close(self):
@@ -569,6 +574,34 @@ class GridDriving(gym.Env):
             for p in poly:
                 gl.glVertex3f(p[0], p[1], 0)
         gl.glEnd()
+
+    def show_risk(self):
+        # print('%s' % self.infos)
+        # print("%s" % hasattr(self, 'reward_strategy'))
+        if self.infos[0] != None and self.infos[0]['on_rect'] and hasattr(self, 'reward_strategy'):
+            # win = self.env.viewers[0].window
+            # win.switch_to()
+            # win.dispatch_events()
+            rect = self.infos[0]['last_rect']
+            rectx = sorted(list(set(map(lambda item: item[0], rect)))) # unique x
+            recty = sorted(list(set(map(lambda item: item[1], rect)))) # unique y
+            # gl.glViewport(0, 0, 96, 96)
+            gl.glPointSize(3.3)
+            gl.glBegin(gl.GL_POINTS)
+            oc = [0.5, 0.5, 0.5]
+            gl.glColor4f(*oc, 1.0)
+            x = rectx[0]
+            while x < rectx[1]:
+                y = recty[0]
+                while y < recty[1]:
+                    r = self.reward_strategy.risk(x, y)
+                    gl.glColor4f(r*oc[0], r*oc[1], r*oc[2], 1.0)
+                    print("%s = %s" % ((x, y), r))
+                    gl.glVertex2f(x, y, 0)
+                    y += 1.0
+                x += 1.0
+            gl.glEnd()
+
 
     # TODO: Some blocks in here are probably not needed
     def render_indicators(self, W, H, car_idx):
