@@ -42,9 +42,13 @@ class GridDriving(gym.Env):
         if k==key.UP:    self.extra_actions[car_idx][1] = 0
         if k==key.DOWN: self.extra_actions[car_idx][2] = 0
 
-    def __init__(self, structure=None, structure_exclude=None, init_pos=None, finish_pos=None, play_mode=False, play_mode_idx=0):
+    def __init__(self, structure=None, structure_exclude=None, init_pos=None, finish_pos=None, other_agents={}, play_mode=False, play_mode_idx=0):
         
+        global NUM_VEHICLES
+        NUM_VEHICLES = 1+len(other_agents)
+        self.NUM_VEHICLES = NUM_VEHICLES
         assert(NUM_VEHICLES > 0)
+        self.other_agents = other_agents
         self.pre_provided_lattice = structure
         self.delete_edges = structure_exclude
         self.play_mode = play_mode
@@ -250,6 +254,9 @@ class GridDriving(gym.Env):
 
         # apply the action to the available vehicles and step
         for car_idx, action in enumerate(actions):
+            if car_idx != 0:
+                if self.other_agents[str(car_idx)] == "stop":
+                    action = np.array([0.0, 0.0, 1.0]) # BRAKE
             if action is not None:
                 if action[0] <= -1: action[0] = -1
                 if action[0] >= 1: action[0] = 1
@@ -328,17 +335,18 @@ class GridDriving(gym.Env):
             vel = self.cars[car_idx].hull.linearVelocity
             speed = np.sqrt(vel[0]**2+vel[1]**2)
             self.infos[car_idx] = dict(empty_dict)
-            self.infos[car_idx]['traffic_light'] = values[0]
             self.infos[car_idx]['lane_localization'] = self.loc[car_idx]
             self.infos[car_idx]['on_rect'] = self.loc[car_idx] in ['left', 'right']
             self.infos[car_idx]['off_road'] = self.loc[car_idx] == 'off-road'
             self.infos[car_idx]['junction'] = self.loc[car_idx] == 'junction'
-            self.infos[car_idx]['type_intersection'] = values[1]
-            self.infos[car_idx]['only_turn'] = values[2] if self.loc[car_idx] == 'right' else None
-            self.infos[car_idx]['junction_pos'] = values[3]
+            if values != None:
+                self.infos[car_idx]['traffic_light'] = values[0]
+                self.infos[car_idx]['type_intersection'] = values[1]
+                self.infos[car_idx]['only_turn'] = values[2] if self.loc[car_idx] == 'right' else None
+                self.infos[car_idx]['junction_pos'] = values[3]
             self.infos[car_idx]['speed'] = speed
             self.infos[car_idx]['pos'] = (pos.x, pos.y)
-            self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
+            # self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
 
         # Reward Assignment (sparse)
         step_rewards = [0 for i in range(len(actions))]
@@ -355,8 +363,8 @@ class GridDriving(gym.Env):
                 x, y = self.cars[car_idx].hull.position
 
                 # Or if close to finish coordinates
-                if self.finish_pos:
-                    i, j = self.finish_pos[car_idx]
+                if self.finish_pos and car_idx == 0:
+                    i, j = self.finish_pos
                     i -= 0.5
                     j += 0.5
                     fx, fy = i*EDGE_WIDTH, j*EDGE_WIDTH
@@ -391,8 +399,10 @@ class GridDriving(gym.Env):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:
-            for i in range(NUM_VEHICLES):
-                self.render(i, mode, pts)
+            self.render(0, mode, pts)
+            # Uncomment for multiple viewers
+            # for i in range(NUM_VEHICLES):
+            #     self.render(i, mode, pts)
             return
 
         # Make the transforms and score labels if needed
@@ -402,7 +412,7 @@ class GridDriving(gym.Env):
             self.transforms = [None for i in range(NUM_VEHICLES)]        
 
         # Construct a viewer for this car with score label and transform object
-        if self.viewers[car_idx] is None:
+        if self.viewers[car_idx] is None and car_idx == 0:
             self.viewers[car_idx] = rendering.Viewer(WINDOW_W, WINDOW_H)
             self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
             x=10, y=80,
@@ -423,6 +433,7 @@ class GridDriving(gym.Env):
             self.transforms[car_idx] = rendering.Transform()
 
         if "t" not in self.__dict__: return  # reset() not called yet
+        if car_idx != 0: return None, None
 
         # Create zoom effect and car following for this specific car
         # zoom = 0.1*SCALE*max(1-self.t[car_idx], 0) + ZOOM*SCALE*min(self.t[car_idx], 1)   # Animate zoom first second
