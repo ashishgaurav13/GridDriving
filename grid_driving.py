@@ -336,17 +336,23 @@ class GridDriving(gym.Env):
             vel = self.cars[car_idx].hull.linearVelocity
             speed = np.sqrt(vel[0]**2+vel[1]**2)
             self.infos[car_idx] = dict(empty_dict)
-            self.infos[car_idx]['lane_localization'] = self.loc[car_idx]
-            self.infos[car_idx]['on_rect'] = self.loc[car_idx] in ['left', 'right']
+            # self.infos[car_idx]['lane_localization'] = self.loc[car_idx]
+            # self.infos[car_idx]['on_rect'] = self.loc[car_idx] in ['left', 'right']
+            if self.loc[car_idx] in ['left', 'right']:
+                self.infos[car_idx]['lane'] = self.loc[car_idx]
             self.infos[car_idx]['off_road'] = self.loc[car_idx] == 'off-road'
-            self.infos[car_idx]['junction'] = self.loc[car_idx] == 'junction'
+            # self.infos[car_idx]['junction'] = self.loc[car_idx] == 'junction'
             if values != None:
                 self.infos[car_idx]['traffic_light'] = values[0]
                 self.infos[car_idx]['type_intersection'] = values[1]
                 self.infos[car_idx]['only_turn'] = values[2] if self.loc[car_idx] == 'right' else None
-                self.infos[car_idx]['junction_pos'] = values[3]
-            self.infos[car_idx]['speed'] = speed
-            self.infos[car_idx]['pos'] = (pos.x, pos.y)
+                # self.infos[car_idx]['junction_pos'] = values[3]
+            self.infos[car_idx]['v'] = speed
+            self.infos[car_idx]['vx'] = vel.x
+            self.infos[car_idx]['vy'] = vel.y
+            # self.infos[car_idx]['pos'] = (pos.x, pos.y)
+            self.infos[car_idx]['x'] = pos.x
+            self.infos[car_idx]['y'] = pos.y
             # self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
 
         # Reward Assignment (sparse)
@@ -388,6 +394,17 @@ class GridDriving(gym.Env):
                 self.score_labels[car_idx][1].text = 'lane_localization: %s' % self.infos[car_idx]['lane_localization']
                 self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
                 self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
+
+        # Remove None(s), more infos formatting
+        for car_idx in range(NUM_VEHICLES):
+            final_dict = {}
+            for key in self.infos[car_idx].keys():
+                if self.infos[car_idx][key] != None:
+                    final_dict[key] = self.infos[car_idx][key]
+                    if type(final_dict[key]) in [float, np.float64]:
+                        final_dict[key] = round(final_dict[key], 2)
+            self.infos[car_idx] = final_dict
+        self.infos = {car_idx:self.infos[car_idx] for car_idx in range(NUM_VEHICLES)}
 
         return self.states, step_rewards, done_values, self.infos
 
@@ -556,7 +573,7 @@ class GridDriving(gym.Env):
             gl.glViewport(0, 0, VP_W, VP_H)
             t.enable()
             self.render_road()
-            self.show_risk()
+            # self.show_risk()
             self.render_additional_points(pts)
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
@@ -579,7 +596,7 @@ class GridDriving(gym.Env):
             gl.glViewport(0, 0, WINDOW_W, WINDOW_H)
             t.enable()
             self.render_road()
-            self.show_risk()
+            # self.show_risk()
             self.render_additional_points(pts)
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
