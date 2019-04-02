@@ -290,27 +290,28 @@ class GridDriving(gym.Env):
             if self.last_tile_direction[car_idx] == None:
                 continue
             vx, vy = self.cars[car_idx].hull.linearVelocity
+            theta = self.cars[car_idx].hull.angle % np.pi
             # What is the right direction
             right_dir = self.last_tile_direction[car_idx]
             if right_dir == "l":
-                if vx < -min_speed:
+                if vx < -min_speed or np.pi/4 <= theta < 3*np.pi/4:
                     self.loc[car_idx] = "right"
-                elif vx > min_speed:
+                elif vx > min_speed or 5*np.pi/4 <= theta < 7*np.pi/4:
                     self.loc[car_idx] = "left"
             elif right_dir == "r":
-                if vx > min_speed:
+                if vx > min_speed or 5*np.pi/4 <= theta < 7*np.pi/4:
                     self.loc[car_idx] = "right"
-                elif vx < -min_speed:
+                elif vx < -min_speed or np.pi/4 <= theta < 3*np.pi/4:
                     self.loc[car_idx] = "left"
             elif right_dir == "t":
-                if vy > min_speed:
+                if vy > min_speed or (0 <= theta < np.pi/4 or 7*np.pi/4 <= theta < 2*np.pi):
                     self.loc[car_idx] = "right"
-                elif vy < -min_speed:
+                elif vy < -min_speed or 3*np.pi/4 <= theta < 5*np.pi/4:
                     self.loc[car_idx] = "left"
             elif right_dir == "b":
-                if vy < -min_speed:
+                if vy < -min_speed or 3*np.pi/4 <= theta < 5*np.pi/4:
                     self.loc[car_idx] = "right"
-                elif vy > min_speed:
+                elif vy > min_speed or (0 <= theta < np.pi/4 or 7*np.pi/4 <= theta < 2*np.pi):
                     self.loc[car_idx] = "left"
             elif right_dir == "n":
                 # TODO: Assuming there are no 1-edge junctions
