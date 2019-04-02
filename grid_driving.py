@@ -51,6 +51,9 @@ class GridDriving(gym.Env):
         self.init_pos = init_pos
         self.finish_pos = finish_pos
         self.dist_eps = 20.0
+        self.EDGE_WIDTH = EDGE_WIDTH
+        self.DT = 1.0/FPS
+        self.LANE_WIDTH = LANE_WIDTH
         assert(play_mode_idx in range(NUM_VEHICLES))
         self.play_mode_car_idx = play_mode_idx
 
@@ -384,12 +387,12 @@ class GridDriving(gym.Env):
         return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
             self.cars[car_idx].hull.position)
 
-    def render(self, car_idx=None, mode='human'):
+    def render(self, car_idx=None, mode='human', pts=None):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:
             for i in range(NUM_VEHICLES):
-                self.render(i, mode)
+                self.render(i, mode, pts)
             return
 
         # Make the transforms and score labels if needed
@@ -542,6 +545,7 @@ class GridDriving(gym.Env):
             t.enable()
             self.render_road()
             self.show_risk()
+            self.render_additional_points(pts)
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
             t.disable()
@@ -564,6 +568,7 @@ class GridDriving(gym.Env):
             t.enable()
             self.render_road()
             self.show_risk()
+            self.render_additional_points(pts)
             for geom in self.viewers[car_idx].onetime_geoms:
                 geom.render()
             t.disable()
@@ -600,6 +605,15 @@ class GridDriving(gym.Env):
             gl.glColor4f(color[0], color[1], color[2], 1)
             for p in poly:
                 gl.glVertex3f(p[0], p[1], 0)
+        gl.glEnd()
+
+    def render_additional_points(self, pts):
+        if pts == None: return
+        gl.glPointSize(5)
+        gl.glBegin(gl.GL_POINTS)
+        for (x, y) in pts:
+            gl.glColor4f(0, 0, 1.0, 1.0)
+            gl.glVertex2f(x, y, 0)
         gl.glEnd()
 
     def show_risk(self):
