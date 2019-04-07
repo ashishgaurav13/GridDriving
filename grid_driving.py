@@ -42,11 +42,12 @@ class GridDriving(gym.Env):
         if k==key.UP:    self.extra_actions[car_idx][1] = 0
         if k==key.DOWN: self.extra_actions[car_idx][2] = 0
 
-    def __init__(self, structure=None, structure_exclude=None, init_pos=None, finish_pos=None, other_agents={}, play_mode=False, play_mode_idx=0):
+    def __init__(self, structure=None, structure_exclude=None, init_pos=None, rules=[], finish_pos=None, other_agents={}, play_mode=False, play_mode_idx=0):
         
         global NUM_VEHICLES
         NUM_VEHICLES = 1+len(other_agents)
         self.NUM_VEHICLES = NUM_VEHICLES
+        self.rules = rules # TODO: move out
         assert(NUM_VEHICLES > 0)
         self.other_agents = other_agents
         self.pre_provided_lattice = structure
@@ -55,6 +56,7 @@ class GridDriving(gym.Env):
         self.init_pos = init_pos
         self.finish_pos = finish_pos
         self.dist_eps = 20.0
+        self.collision_eps = 10.0
         self.EDGE_WIDTH = EDGE_WIDTH
         self.DT = 1.0/FPS
         self.LANE_WIDTH = LANE_WIDTH
@@ -380,6 +382,15 @@ class GridDriving(gym.Env):
                     dist = ((fx-x)**2+(fy-y)**2)**0.5
                     if dist < self.dist_eps:
                         done_values[car_idx] = True
+
+                # Check collision
+                if car_idx == 0 and NUM_VEHICLES > 1:
+                    for ci in range(1, NUM_VEHICLES):
+                        cx, cy = self.cars[ci].hull.position
+                        x, y = self.cars[car_idx].hull.position
+                        dist = ((x-cx)**2+(y-cy)**2)**0.5
+                        if dist < self.collision_eps:
+                            done_values[car_idx] = True
 
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                     done_values[car_idx] = True
