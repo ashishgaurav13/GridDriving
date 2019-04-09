@@ -1,5 +1,6 @@
 import sys, math
 import numpy as np
+from collections import deque
 
 import Box2D
 from Box2D import b2Vec2, b2Dot
@@ -60,6 +61,7 @@ class GridDriving(gym.Env):
         self.EDGE_WIDTH = EDGE_WIDTH
         self.DT = 1.0/FPS
         self.LANE_WIDTH = LANE_WIDTH
+        self.last_positions = deque(maxlen=200) # TIMEOUT
         assert(play_mode_idx in range(NUM_VEHICLES))
         self.play_mode_car_idx = play_mode_idx
 
@@ -391,6 +393,22 @@ class GridDriving(gym.Env):
                         dist = ((x-cx)**2+(y-cy)**2)**0.5
                         if dist < self.collision_eps:
                             done_values[car_idx] = True
+
+                # If position didn't change then terminate
+                if car_idx == 0:
+                    x, y = self.cars[car_idx].hull.position
+                    x -= self.off_params[0]
+                    y -= self.off_params[1]
+                    x /= self.EDGE_WIDTH
+                    y /= self.EDGE_WIDTH
+                    self.last_positions.append((x, y))
+                if car_idx == 0 and len(self.last_positions) == self.last_positions.maxlen:
+                    x1, y1 = self.last_positions[0]
+                    x2, y2 = self.last_positions[-1]
+                    d = ((x1-x2)**2+(y1-y2)**2)**0.5
+                    if d < 0.02:
+                        print('TIMEOUT: (%f,%f)->(%f,%f)' % (x1, y1, x2, y2))
+                        done_values[car_idx] = True
 
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                     done_values[car_idx] = True
