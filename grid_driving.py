@@ -57,7 +57,7 @@ class GridDriving(gym.Env):
         self.init_pos = init_pos
         self.finish_pos = finish_pos
         self.dist_eps = 20.0
-        self.collision_eps = 10.0
+        self.collision_eps = 7.0
         self.EDGE_WIDTH = EDGE_WIDTH
         self.DT = 1.0/FPS
         self.LANE_WIDTH = LANE_WIDTH
@@ -392,6 +392,7 @@ class GridDriving(gym.Env):
                         x, y = self.cars[car_idx].hull.position
                         dist = ((x-cx)**2+(y-cy)**2)**0.5
                         if dist < self.collision_eps:
+                            print('COLLISION: dist to another veh = %f' % dist)
                             done_values[car_idx] = True
 
                 # If position didn't change then terminate
