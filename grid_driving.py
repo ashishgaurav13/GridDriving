@@ -358,6 +358,8 @@ class GridDriving(gym.Env):
             self.infos[car_idx]['x'] = pos.x
             self.infos[car_idx]['y'] = pos.y
             # self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
+            if car_idx == 0:
+                self.infos[car_idx]['reason'] = []
 
         # Reward Assignment (sparse)
         step_rewards = [0 for i in range(len(actions))]
@@ -383,6 +385,7 @@ class GridDriving(gym.Env):
                     fy += self.off_params[1]
                     dist = ((fx-x)**2+(fy-y)**2)**0.5
                     if dist < self.dist_eps:
+                        self.infos[car_idx]['reason'] += ['finish']
                         done_values[car_idx] = True
 
                 # Check collision
@@ -393,6 +396,7 @@ class GridDriving(gym.Env):
                         dist = ((x-cx)**2+(y-cy)**2)**0.5
                         if dist < self.collision_eps:
                             print('COLLISION: dist to another veh = %f' % dist)
+                            self.infos[car_idx]['reason'] += ['collision']
                             done_values[car_idx] = True
 
                 # If position didn't change then terminate
@@ -409,10 +413,12 @@ class GridDriving(gym.Env):
                     d = ((x1-x2)**2+(y1-y2)**2)**0.5
                     if d < 0.02:
                         print('TIMEOUT: (%f,%f)->(%f,%f)' % (x1, y1, x2, y2))
+                        self.infos[car_idx]['reason'] += ['timeout']
                         done_values[car_idx] = True
 
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                     done_values[car_idx] = True
+                    self.infos[car_idx]['reason'] += ['way off']
 
         for car_idx in range(NUM_VEHICLES):
             self.tot_reward[car_idx] += step_rewards[car_idx]
