@@ -57,7 +57,7 @@ class GridDriving(gym.Env):
         self.init_pos = init_pos
         self.finish_pos = finish_pos
         self.dist_eps = 20.0
-        self.collision_eps = 7.0
+        self.collision_eps = 10.0
         self.EDGE_WIDTH = EDGE_WIDTH
         self.DT = 1.0/FPS
         self.LANE_WIDTH = LANE_WIDTH
@@ -644,6 +644,57 @@ class GridDriving(gym.Env):
                 self.viewers[car_idx].close()
                 self.viewers[car_idx] = None
 
+    # Get all important attributes (freeze/microwave)
+    def freeze(self):
+        exc = ['world', 'cars', 'road', 'score_labels', 'contactListener_keepref', 'viewers']
+        return deepcopy_env(self, exc)
+
+    def microwave(self, x):
+        self.close()
+        failures = []
+        for frozen_attr in dir(x):
+            try:
+                setattr(self, frozen_attr, getattr(x, frozen_attr))
+            except:
+                failures.append(frozen_attr)
+        # print('Microwave failures: %s' % failures)
+
+        self.contactListener_keepref = FrictionDetector(self)
+        self.world = Box2D.b2World((0,0), contactListener=self.contactListener_keepref)
+        self.cars = [None for car_idx in range(self.NUM_VEHICLES)]
+        self.viewers = [None for car_idx in range(self.NUM_VEHICLES)]
+        self.score_labels = [[] for i in range(self.NUM_VEHICLES)]
+        self.transforms = [None for i in range(self.NUM_VEHICLES)]
+
+        self.road = []
+        i = 0
+        for polygon in self.track:
+            t = self.world.CreateStaticBody(fixtures = fixtureDef(
+                shape=polygonShape(vertices=list(polygon))
+                ))
+            t.userData = t
+            t.direction = self.directions[i]
+            c = 0.01*(i%3)
+            i += 1
+            t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
+            t.boxtype = "road"
+            t.road_friction = 1.0
+            t.fixtures[0].sensor = True
+            self.road.append(t)
+
+        # print(self.car_info)
+        for car_idx in range(self.NUM_VEHICLES):
+            x, y = self.car_info[car_idx]['pos']
+            angle = self.car_info[car_idx]['angle']
+            self.cars[car_idx] = Car(self.world, angle, x, y)
+            self.cars[car_idx].linearVelocity = self.car_info[car_idx]['v']
+            self.cars[car_idx].angularVelocity = self.car_info[car_idx]['av']
+            for wi, w in enumerate(self.car_info[car_idx]['w']):
+                gas, brake, steer = w
+                self.cars[car_idx].wheels[wi].gas = gas
+                self.cars[car_idx].wheels[wi].brake = brake
+                self.cars[car_idx].wheels[wi].steer = steer
+
     # Render all road pieces common to the whole environment
     def render_road(self):
         gl.glBegin(gl.GL_QUADS)
@@ -701,7 +752,6 @@ class GridDriving(gym.Env):
                     y += 1.0
                 x += 1.0
             gl.glEnd()
-
 
     # TODO: Some blocks in here are probably not needed
     def render_indicators(self, W, H, car_idx):
