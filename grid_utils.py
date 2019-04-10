@@ -606,3 +606,25 @@ def construct_traffic_lights(neighbors, lane_w, r, r2):
 		lights.append(TrafficLight(create_lights_cycle("srrn"), r, r2, (lane_w*0.5, lane_w*-2.5), 0))
 	return lights
 
+def deepcopy_env(env, excluded=None):
+	backed_up = {}
+	if excluded != None:
+		for excluded_attr in excluded:
+			if hasattr(env, excluded_attr):
+				backed_up[excluded_attr] = getattr(env, excluded_attr)
+				setattr(env, excluded_attr, None)
+	# for el in dir(env):
+	#     print('%s:%s' % (el, getattr(env, el)))
+	ret = deepcopy(env)
+	if excluded != None:
+		for backed_up_attr, backup in backed_up.items():
+			setattr(env, backed_up_attr, backup)
+	# Store car information
+	ret.car_info = [{} for i in range(env.NUM_VEHICLES)]
+	for i in range(env.NUM_VEHICLES):
+		ret.car_info[i]['pos'] = list(env.cars[i].hull.position)
+		ret.car_info[i]['angle'] = env.cars[i].hull.angle
+		ret.car_info[i]['v'] = list(env.cars[i].hull.linearVelocity)
+		ret.car_info[i]['av'] = env.cars[i].hull.angularVelocity
+		ret.car_info[i]['w'] = [[getattr(wheel, attr) for attr in ['gas', 'brake', 'steer']] for wheel in env.cars[i].wheels]
+	return ret
