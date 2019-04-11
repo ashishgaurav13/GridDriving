@@ -57,7 +57,7 @@ class GridDriving(gym.Env):
         self.init_pos = init_pos
         self.finish_pos = finish_pos
         self.dist_eps = 20.0
-        self.collision_eps = 10.0
+        self.collision_eps = 7.6
         self.EDGE_WIDTH = EDGE_WIDTH
         self.DT = 1.0/FPS
         self.LANE_WIDTH = LANE_WIDTH
@@ -260,7 +260,9 @@ class GridDriving(gym.Env):
         for car_idx, action in enumerate(actions):
             if car_idx != 0:
                 if self.other_agents[str(car_idx)] == "stop":
-                    action = np.array([0.0, 0.0, 1.0]) # BRAKE
+                    action = np.array([0.0, 0.0, 0.0]) # BRAKE
+                # if list(self.cars[car_idx].hull.linearVelocity) > [0.0, 0.0]:
+                #     print(self.cars[car_idx].hull.linearVelocity)
             if action is not None:
                 if action[0] <= -1: action[0] = -1
                 if action[0] >= 1: action[0] = 1
@@ -395,7 +397,7 @@ class GridDriving(gym.Env):
                         x, y = self.cars[car_idx].hull.position
                         dist = ((x-cx)**2+(y-cy)**2)**0.5
                         if dist < self.collision_eps:
-                            print('COLLISION: dist to another veh = %f' % dist)
+                            # print('COLLISION: dist to another veh = %f' % dist)
                             self.infos[car_idx]['reason'] += ['collision']
                             done_values[car_idx] = True
 
@@ -412,11 +414,14 @@ class GridDriving(gym.Env):
                     x2, y2 = self.last_positions[-1]
                     d = ((x1-x2)**2+(y1-y2)**2)**0.5
                     if d < 0.02:
-                        print('TIMEOUT: (%f,%f)->(%f,%f)' % (x1, y1, x2, y2))
+                        # print('TIMEOUT')
                         self.infos[car_idx]['reason'] += ['timeout']
                         done_values[car_idx] = True
 
                 if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
+                    done_values[car_idx] = True
+
+                if car_idx == 0 and self.infos[car_idx]['off_road']:
                     done_values[car_idx] = True
                     self.infos[car_idx]['reason'] += ['way off']
 
@@ -693,13 +698,20 @@ class GridDriving(gym.Env):
             x, y = self.car_info[car_idx]['pos']
             angle = self.car_info[car_idx]['angle']
             self.cars[car_idx] = Car(self.world, angle, x, y)
-            self.cars[car_idx].linearVelocity = self.car_info[car_idx]['v']
-            self.cars[car_idx].angularVelocity = self.car_info[car_idx]['av']
+            # print('MICROWAVING POS %s' % self.car_info[car_idx]['pos'])
+            # print('MICROWAVED POS %s' % self.cars[car_idx].hull.position)
+            self.cars[car_idx].hull.linearVelocity = self.car_info[car_idx]['v']
+            # print('MICROWAVING %s' % self.car_info[car_idx]['v'])
+            # print('MICROWAVED %s' % self.cars[car_idx].hull.linearVelocity)
+            self.cars[car_idx].hull.angularVelocity = self.car_info[car_idx]['av']
             for wi, w in enumerate(self.car_info[car_idx]['w']):
-                gas, brake, steer = w
+                gas, brake, steer, omega, lv, wr = w
                 self.cars[car_idx].wheels[wi].gas = gas
                 self.cars[car_idx].wheels[wi].brake = brake
                 self.cars[car_idx].wheels[wi].steer = steer
+                self.cars[car_idx].wheels[wi].omega = omega
+                self.cars[car_idx].wheels[wi].linearVelocity = lv
+                self.cars[car_idx].wheels[wi].wheel_rad = wr
 
     # Render all road pieces common to the whole environment
     def render_road(self):

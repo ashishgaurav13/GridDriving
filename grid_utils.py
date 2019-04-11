@@ -623,8 +623,10 @@ def deepcopy_env(env, excluded=None):
 	ret.car_info = [{} for i in range(env.NUM_VEHICLES)]
 	for i in range(env.NUM_VEHICLES):
 		ret.car_info[i]['pos'] = list(env.cars[i].hull.position)
+		# print('FREEZING POS %s' % ret.car_info[i]['pos'])
 		ret.car_info[i]['angle'] = env.cars[i].hull.angle
 		ret.car_info[i]['v'] = list(env.cars[i].hull.linearVelocity)
+		# print('FREEZING %s' % ret.car_info[i]['v'])
 		ret.car_info[i]['av'] = env.cars[i].hull.angularVelocity
-		ret.car_info[i]['w'] = [[getattr(wheel, attr) for attr in ['gas', 'brake', 'steer']] for wheel in env.cars[i].wheels]
+		ret.car_info[i]['w'] = [[getattr(wheel, attr) for attr in ['gas', 'brake', 'steer', 'omega', 'linearVelocity', 'wheel_rad']] for wheel in env.cars[i].wheels]
 	return ret
