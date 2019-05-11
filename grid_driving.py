@@ -373,12 +373,12 @@ class GridDriving(gym.Env):
             self.tot_reward[car_idx] += step_rewards[car_idx]
 
         # Update score labels
-        for car_idx in range(NUM_VEHICLES):
-            if self.viewers[car_idx] != None:
-                self.score_labels[car_idx][0].text = 'traffic_light: %s' % self.infos[car_idx]['traffic_light']
-                self.score_labels[car_idx][1].text = 'lane_localization: %s' % self.infos[car_idx]['lane_localization']
-                self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
-                self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
+        # for car_idx in range(NUM_VEHICLES):
+        #     if self.viewers[car_idx] != None:
+        #         self.score_labels[car_idx][0].text = 'traffic_light: %s' % self.infos[car_idx]['traffic_light']
+        #         self.score_labels[car_idx][1].text = 'lane_localization: %s' % self.infos[car_idx]['lane_localization']
+        #         self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
+        #         self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
 
         return self.states, step_rewards, done_values, self.infos
 
@@ -387,7 +387,7 @@ class GridDriving(gym.Env):
         return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
             self.cars[car_idx].hull.position)
 
-    def render(self, car_idx=None, mode='human', pts=None):
+    def render(self, car_idx=0, mode='human', pts=None):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:
@@ -396,30 +396,30 @@ class GridDriving(gym.Env):
             return
 
         # Make the transforms and score labels if needed
-        if "score_labels" not in self.__dict__:
-            self.score_labels = [[] for i in range(NUM_VEHICLES)]
+        # if "score_labels" not in self.__dict__:
+        #     self.score_labels = [[] for i in range(NUM_VEHICLES)]
         if "transforms" not in self.__dict__:
             self.transforms = [None for i in range(NUM_VEHICLES)]        
 
         # Construct a viewer for this car with score label and transform object
         if self.viewers[car_idx] is None:
             self.viewers[car_idx] = rendering.Viewer(WINDOW_W, WINDOW_H)
-            self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
-            x=10, y=80,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('lane_localization: ?', font_size=12,
-            x=10, y=60,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('type_intersection: ?', font_size=12,
-            x=10, y=40,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('only_turn: ?', font_size=12,
-            x=10, y=20,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
+            # x=10, y=80,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('lane_localization: ?', font_size=12,
+            # x=10, y=60,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('type_intersection: ?', font_size=12,
+            # x=10, y=40,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('only_turn: ?', font_size=12,
+            # x=10, y=20,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
             self.transforms[car_idx] = rendering.Transform()
 
         if "t" not in self.__dict__: return  # reset() not called yet
@@ -677,5 +677,5 @@ class GridDriving(gym.Env):
         # horiz_ind(20, -10.0*self.cars[car_idx].wheels[0].joint.angle, (0,1,0))
         # horiz_ind(30, -0.8*self.cars[car_idx].hull.angularVelocity, (1,0,0))
         gl.glEnd()
-        for el in self.score_labels[car_idx]:
-            el.draw()
+        # for el in self.score_labels[car_idx]:
+        #     el.draw()
