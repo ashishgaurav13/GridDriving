@@ -387,7 +387,7 @@ class GridDriving(gym.Env):
         return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
             self.cars[car_idx].hull.position)
 
-    def render(self, car_idx=0, mode='human', pts=None):
+    def render(self, car_idx=None, mode='human', pts=None):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:

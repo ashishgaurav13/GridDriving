@@ -1,5 +1,7 @@
 import numpy as np
 import random
+import warnings
+warnings.filterwarnings("ignore")
 
 from grid_driving import GridDriving
 from constants import *
@@ -19,8 +21,6 @@ env = GridDriving([
 actions = [np.array( [0.0, 0.0, 0.0] ) for i in range(NUM_VEHICLES)]
 
 def key_press(k, mod, car_idx):
-    global restart
-    if k==0xff0d: restart = True
     if k==key.LEFT:  actions[car_idx][0] = -1.0
     if k==key.RIGHT: actions[car_idx][0] = +1.0
     if k==key.UP:    actions[car_idx][1] = +1.0
@@ -34,23 +34,19 @@ def key_release(k, mod, car_idx):
 
 env.reset()
 total_rewards = np.array(make_n_rewards(NUM_VEHICLES))
+env.viewers[0].window.on_key_press = lambda k, mod: key_press(k, mod, 0)
+env.viewers[0].window.on_key_release = lambda k, mod: key_release(k, mod, 0)
+env.viewers[1].window.set_visible(False)
 
-for car_idx in range(NUM_VEHICLES):
-    env.render(car_idx)
-    env.viewers[car_idx].window.on_key_press = lambda k, mod: key_press(k, mod, car_idx)
-    env.viewers[car_idx].window.on_key_release = lambda k, mod: key_release(k, mod, car_idx)
-
-    
 while True:
 
     states, rewards, done_values, info = env.step(actions)
     total_rewards += np.array(rewards)
     
     # Render a viewer for each car
-    for car_idx in range(NUM_VEHICLES):
-        _, _ = env.render(car_idx=car_idx)
+    env.render()
 
-    # if done or restart: break
+    if done_values[0]: break
 
 # End simulation
 env.close()
