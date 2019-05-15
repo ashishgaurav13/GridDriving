@@ -97,10 +97,12 @@ class GridDriving(gym.Env):
 
         # action space has steer (-1, 0, 1), gas (0, 1), brake (0, 1)
         self.action_spaces = make_n_action_spaces(NUM_VEHICLES)
+        self.action_space = self.action_spaces[0] # Better way?
 
         # produce an observation space of rows x cols x 3
         state_dims = (STATE_H, STATE_W, 3)
         self.observation_spaces = make_n_state_spaces(NUM_VEHICLES, state_dims)
+        self.observation_space = self.observation_spaces[0] # Better way?
 
     def _destroy(self):
 
@@ -380,7 +382,7 @@ class GridDriving(gym.Env):
         #         self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
         #         self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
 
-        return self.states, step_rewards, done_values, self.infos
+        return self.states[0], step_rewards[0], done_values[0], self.infos
 
     # Determine if the car is offroad or onroad
     def determine_onroad(self, car_idx):
@@ -391,9 +393,10 @@ class GridDriving(gym.Env):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:
-            for i in range(NUM_VEHICLES):
-                self.render(i, mode, pts)
-            return
+            return self.render(0, mode, pts)
+            # for i in range(NUM_VEHICLES):
+            #     self.render(i, mode, pts)
+            # return
 
         # Make the transforms and score labels if needed
         # if "score_labels" not in self.__dict__:
@@ -404,6 +407,8 @@ class GridDriving(gym.Env):
         # Construct a viewer for this car with score label and transform object
         if self.viewers[car_idx] is None:
             self.viewers[car_idx] = rendering.Viewer(WINDOW_W, WINDOW_H)
+            if car_idx != 0:
+                self.viewers[car_idx].window.set_visible(False)
             # self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
             # x=10, y=80,
             # anchor_x='left', anchor_y='center', font_name='Helvetica',
