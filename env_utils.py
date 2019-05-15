@@ -12,7 +12,7 @@ def make_n_state_spaces(n, state_dims):
     return [spaces.Box(
         low=0, high=255, 
         shape=state_dims, 
-        dtype=np.uint8) for i in range(n)]
+        dtype=np.float64) for i in range(n)]
 
 def seed(env, seed=None):
     env.np_random, seed = seeding.np_random(seed)

@@ -9,7 +9,7 @@ def rgb2gray(rgb):
 # Licensed on the same terms as the rest of OpenAI Gym.
 # Modified by Ashish Gaurav.
 
-STATE_W, STATE_H = 96, 96
+STATE_W, STATE_H = 200, 200
 VIDEO_W, VIDEO_H = 700, 700
 # Comment this out if you're not testing
 # Also uncomment the transform part
