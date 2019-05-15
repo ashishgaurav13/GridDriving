@@ -99,8 +99,8 @@ class GridDriving(gym.Env):
         self.action_spaces = make_n_action_spaces(NUM_VEHICLES)
         self.action_space = self.action_spaces[0] # Better way?
 
-        # produce an observation space of rows x cols x 3
-        state_dims = (STATE_H, STATE_W, 3)
+        # produce an observation space of rows x cols x 1
+        state_dims = (STATE_H, STATE_W, 1)
         self.observation_spaces = make_n_state_spaces(NUM_VEHICLES, state_dims)
         self.observation_space = self.observation_spaces[0] # Better way?
 
@@ -559,10 +559,12 @@ class GridDriving(gym.Env):
             # image_data.save('tmp%d.png'%car_idx)
             arr = np.frombuffer(image_data.data, dtype=np.uint8)
             arr = arr.reshape(VP_H, VP_W, 4)
-            arr = arr[::-1, :, 0:3].astype(np.float64)
+            arr = arr[::-1, :, 0:3]
+            arr = rgb2gray(arr)
+            # arr = arr[::-1, :, 0:3].astype(np.float64)
             # arr = rgb2gray(arr)
-            # arr = arr.reshape(arr.shape[0], arr.shape[1], 1)
-            arr /= 255.0
+            arr = arr.reshape(arr.shape[0], arr.shape[1], 1)
+            # arr /= 255.0
         if mode=="rgb_array" and not self.human_render: # agent can call or not call env.render() itself when recording video.
             win.flip()
         if mode=='human':
