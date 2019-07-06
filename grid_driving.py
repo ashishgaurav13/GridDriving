@@ -97,10 +97,12 @@ class GridDriving(gym.Env):
 
         # action space has steer (-1, 0, 1), gas (0, 1), brake (0, 1)
         self.action_spaces = make_n_action_spaces(NUM_VEHICLES)
+        self.action_space = self.action_spaces[0] # Better way?
 
-        # produce an observation space of rows x cols x 3
-        state_dims = (STATE_H, STATE_W, 3)
+        # produce an observation space of rows x cols x 1
+        state_dims = (STATE_H, STATE_W, 1)
         self.observation_spaces = make_n_state_spaces(NUM_VEHICLES, state_dims)
+        self.observation_space = self.observation_spaces[0] # Better way?
 
     def _destroy(self):
 
@@ -373,53 +375,57 @@ class GridDriving(gym.Env):
             self.tot_reward[car_idx] += step_rewards[car_idx]
 
         # Update score labels
-        for car_idx in range(NUM_VEHICLES):
-            if self.viewers[car_idx] != None:
-                self.score_labels[car_idx][0].text = 'traffic_light: %s' % self.infos[car_idx]['traffic_light']
-                self.score_labels[car_idx][1].text = 'lane_localization: %s' % self.infos[car_idx]['lane_localization']
-                self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
-                self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
+        # for car_idx in range(NUM_VEHICLES):
+        #     if self.viewers[car_idx] != None:
+        #         self.score_labels[car_idx][0].text = 'traffic_light: %s' % self.infos[car_idx]['traffic_light']
+        #         self.score_labels[car_idx][1].text = 'lane_localization: %s' % self.infos[car_idx]['lane_localization']
+        #         self.score_labels[car_idx][2].text = 'type_intersection: %s' % self.infos[car_idx]['type_intersection']
+        #         self.score_labels[car_idx][3].text = 'only_turn: %s' % self.infos[car_idx]['only_turn']
 
-        return self.states, step_rewards, done_values, self.infos
+        return self.states[0], step_rewards[0], done_values[0], self.infos
 
     # Determine if the car is offroad or onroad
     def determine_onroad(self, car_idx):
         return determine_road(self.lattice, EDGE_WIDTH, self.road_poly,
             self.cars[car_idx].hull.position)
 
-    def render(self, car_idx=None, mode='human', pts=None):
+    def render(self, car_idx=None, mode='human', pts=None,
+               show_costmap = False):
 
         # If car_idx = None, then all cars should be shown in different windows
         if car_idx is None:
-            for i in range(NUM_VEHICLES):
-                self.render(i, mode, pts)
-            return
+            return self.render(0, mode, pts)
+            # for i in range(NUM_VEHICLES):
+            #     self.render(i, mode, pts)
+            # return
 
         # Make the transforms and score labels if needed
-        if "score_labels" not in self.__dict__:
-            self.score_labels = [[] for i in range(NUM_VEHICLES)]
+        # if "score_labels" not in self.__dict__:
+        #     self.score_labels = [[] for i in range(NUM_VEHICLES)]
         if "transforms" not in self.__dict__:
             self.transforms = [None for i in range(NUM_VEHICLES)]        
 
         # Construct a viewer for this car with score label and transform object
         if self.viewers[car_idx] is None:
             self.viewers[car_idx] = rendering.Viewer(WINDOW_W, WINDOW_H)
-            self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
-            x=10, y=80,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('lane_localization: ?', font_size=12,
-            x=10, y=60,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('type_intersection: ?', font_size=12,
-            x=10, y=40,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
-            self.score_labels[car_idx].append(pyglet.text.Label('only_turn: ?', font_size=12,
-            x=10, y=20,
-            anchor_x='left', anchor_y='center', font_name='Helvetica',
-            color=(255,255,255,255)))
+            if car_idx != 0:
+                self.viewers[car_idx].window.set_visible(False)
+            # self.score_labels[car_idx].append(pyglet.text.Label('traffic_light: ?', font_size=12,
+            # x=10, y=80,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('lane_localization: ?', font_size=12,
+            # x=10, y=60,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('type_intersection: ?', font_size=12,
+            # x=10, y=40,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
+            # self.score_labels[car_idx].append(pyglet.text.Label('only_turn: ?', font_size=12,
+            # x=10, y=20,
+            # anchor_x='left', anchor_y='center', font_name='Helvetica',
+            # color=(255,255,255,255)))
             self.transforms[car_idx] = rendering.Transform()
 
         if "t" not in self.__dict__: return  # reset() not called yet
@@ -554,10 +560,12 @@ class GridDriving(gym.Env):
             # image_data.save('tmp%d.png'%car_idx)
             arr = np.frombuffer(image_data.data, dtype=np.uint8)
             arr = arr.reshape(VP_H, VP_W, 4)
-            arr = arr[::-1, :, 0:3].astype(np.float64)
+            arr = arr[::-1, :, 0:3]
+            arr = rgb2gray(arr)
+            # arr = arr[::-1, :, 0:3].astype(np.float64)
             # arr = rgb2gray(arr)
-            # arr = arr.reshape(arr.shape[0], arr.shape[1], 1)
-            arr /= 255.0
+            arr = arr.reshape(arr.shape[0], arr.shape[1], 1)
+            # arr /= 255.0
         if mode=="rgb_array" and not self.human_render: # agent can call or not call env.render() itself when recording video.
             win.flip()
         if mode=='human':
@@ -677,5 +685,66 @@ class GridDriving(gym.Env):
         # horiz_ind(20, -10.0*self.cars[car_idx].wheels[0].joint.angle, (0,1,0))
         # horiz_ind(30, -0.8*self.cars[car_idx].hull.angularVelocity, (1,0,0))
         gl.glEnd()
-        for el in self.score_labels[car_idx]:
-            el.draw()
+        # for el in self.score_labels[car_idx]:
+        #     el.draw()
+
+# Evaluates gauss func with means and stddevs at x,y
+def gaussFunc(x, y, means, stddevs = [1,1]):
+    expnt = -1*np.square(x-means[0])/(2*np.square(stddevs[0]))
+    expnt -= np.square(y-means[1])/(2*np.square(stddevs[1]))
+    coeff = 1/(np.sqrt(2*3.14159) * stddevs[0])
+    return coeff*np.exp(expnt)
+
+# Returns image like array of 2d gaussian
+# centered at 2-list means with stddevs specified
+# normalizes to [0,1]
+def draw2DGauss(means, stddevs = [1,1]):
+    r,c = STATE_H, STATE_W
+    new_img = np.zeros((r,c))
+    for i in range(r):
+        for j in range(c):
+            new_img[i][j] = gaussFunc(i, j, means, stddevs)
+    max_val = np.amax(new_img)
+    new_img /= max_val
+    return new_img
+
+
+# Checks if a position is in the viewer
+# Takes x,y of bottom left of viewer
+# and position of object we're checking
+def in_viewer(viewer_bl, pos):
+    x,y = pos
+    if(x >= viewer_bl[0] and x < viewer_bl[0] + STATE_W and
+       y >= viewer_bl[1] and y < viewer_bl[1] + STATE_H):
+        return True
+    else:
+        return False
+
+# Takes x,y coords and returns r,c coords
+# Assumes coords are relative to bottom left of state
+def xy_to_rc(x,y):
+    c = x
+    r = STATE_H - y
+    return r,c
+
+# Gets costmap as 2d array
+def get_costmap(info):
+    my_pos = info[0]["pos"] # Main car pos
+    costmap = np.zeros((STATE_H,
+                        STATE_W))
+    origin = [my_pos[0]-(STATE_W//2), 
+              my_pos[1]-(STATE_H//2)] # origin (bottom left) of renderer
+    for i in range(1, len(info)):
+        car = info[i]
+        other_pos = car["pos"]
+        if(in_viewer(origin, other_pos)): # Only draw costmap if in view
+              # IMPORTANT NOTE: Position data may be wrong here,
+              # without rotation and knowledge on orientation, I'm not sure
+              # how to fix it (conversion from x/y to row/col
+              r,c = (other_pos[1] - origin[1],
+                    other_pos[0] - origin[0])
+              gaussian = draw2DGauss([r,c],[15,15])
+              costmap += gaussian
+    return costmap
+              
+            

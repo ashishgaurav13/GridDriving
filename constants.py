@@ -9,7 +9,7 @@ def rgb2gray(rgb):
 # Licensed on the same terms as the rest of OpenAI Gym.
 # Modified by Ashish Gaurav.
 
-STATE_W, STATE_H = 96, 96
+STATE_W, STATE_H = 200, 200
 VIDEO_W, VIDEO_H = 700, 700
 # Comment this out if you're not testing
 # Also uncomment the transform part
@@ -32,7 +32,7 @@ EDGE_WIDTH = 150
 TRAFFIC_LIGHT_R = LANE_WIDTH//3
 TRAFFIC_LIGHT_R2 = 2*LANE_WIDTH//4
 
-NUM_VEHICLES = 1
+NUM_VEHICLES = 5
 
 ConvertRGB = lambda x: list(map(lambda y: y/255.0, x))
 TRAFFIC_LIGHT_OUTER_COLOR = ConvertRGB((80, 126, 27))
