@@ -322,12 +322,14 @@ class GridDriving(gym.Env):
             'junction': None,
             'speed': None,
             'pos': None,
+            'angle' : None
         }
         for car_idx in range(NUM_VEHICLES):
             rstate, values = self.render(mode="state_pixels", car_idx=car_idx)
             self.states.append(rstate) # TODO
             pos = self.cars[car_idx].hull.position
             vel = self.cars[car_idx].hull.linearVelocity
+            ang = self.cars[car_idx].hull.angle
             speed = np.sqrt(vel[0]**2+vel[1]**2)
             self.infos[car_idx] = dict(empty_dict)
             self.infos[car_idx]['traffic_light'] = values[0]
@@ -341,7 +343,7 @@ class GridDriving(gym.Env):
             self.infos[car_idx]['speed'] = speed
             self.infos[car_idx]['pos'] = (pos.x, pos.y)
             self.infos[car_idx]['last_rect'] = tuple(map(tuple, self.road_poly[self.last_pid[car_idx]][0]))
-
+            self.infos[car_idx]['angle'] = ang
         # Reward Assignment (sparse)
         step_rewards = [0 for i in range(len(actions))]
         done_values = [False for i in range(len(actions))]
@@ -688,6 +690,18 @@ class GridDriving(gym.Env):
         # for el in self.score_labels[car_idx]:
         #     el.draw()
 
+FRAME_W, FRAME_H = 170, 170
+
+# rotates point about center
+def rotate(v, center_x, ang):
+    v = np.asarray(v)
+    v = v-center_x
+    R = np.array([[np.cos(ang), -1*np.sin(ang)],
+                  [np.sin(ang), np.cos(ang)]])
+    result = np.dot(R,v)
+    result += center_x
+    return result
+
 # Evaluates gauss func with means and stddevs at x,y
 def gaussFunc(x, y, means, stddevs = [1,1]):
     expnt = -1*np.square(x-means[0])/(2*np.square(stddevs[0]))
@@ -699,7 +713,7 @@ def gaussFunc(x, y, means, stddevs = [1,1]):
 # centered at 2-list means with stddevs specified
 # normalizes to [0,1]
 def draw2DGauss(means, stddevs = [1,1]):
-    r,c = STATE_H, STATE_W
+    r,c = FRAME_H, FRAME_W
     new_img = np.zeros((r,c))
     for i in range(r):
         for j in range(c):
@@ -714,37 +728,46 @@ def draw2DGauss(means, stddevs = [1,1]):
 # and position of object we're checking
 def in_viewer(viewer_bl, pos):
     x,y = pos
-    if(x >= viewer_bl[0] and x < viewer_bl[0] + STATE_W and
-       y >= viewer_bl[1] and y < viewer_bl[1] + STATE_H):
+    if(x >= viewer_bl[0] and x < viewer_bl[0] + FRAME_W and
+       y >= viewer_bl[1] and y < viewer_bl[1] + FRAME_H):
         return True
     else:
         return False
 
-# Takes x,y coords and returns r,c coords
-# Assumes coords are relative to bottom left of state
-def xy_to_rc(x,y):
-    c = x
-    r = STATE_H - y
-    return r,c
+def pad_resize(A):
+    B = np.zeros((STATE_H, STATE_W))
+    r,c = A.shape[0], A.shape[1]
+    offset_r = (STATE_H - r)//2
+    offset_c = (STATE_W - c)//2
+    B[offset_r:offset_r+r, offset_c:offset_c+c] = A
+    return B
 
 # Gets costmap as 2d array
 def get_costmap(info):
     my_pos = info[0]["pos"] # Main car pos
-    costmap = np.zeros((STATE_H,
-                        STATE_W))
-    origin = [my_pos[0]-(STATE_W//2), 
-              my_pos[1]-(STATE_H//2)] # origin (bottom left) of renderer
+    my_ang = info[0]["angle"] - 1.57
+    print(my_ang)
+    costmap = np.zeros((FRAME_H,
+                        FRAME_W))
+    origin = [my_pos[0]-(FRAME_W//2), 
+              my_pos[1]-(FRAME_H//2)] # origin (bottom left) of renderer
     for i in range(1, len(info)):
         car = info[i]
         other_pos = car["pos"]
         if(in_viewer(origin, other_pos)): # Only draw costmap if in view
-              # IMPORTANT NOTE: Position data may be wrong here,
-              # without rotation and knowledge on orientation, I'm not sure
-              # how to fix it (conversion from x/y to row/col
-              r,c = (other_pos[1] - origin[1],
-                    other_pos[0] - origin[0])
+              # x and y w.r.t. to above origin
+              x_wrt_o = other_pos[0] - origin[0]
+              y_wrt_o = other_pos[1] - origin[1]
+              # Center at where car is on screen
+              center = np.array([FRAME_W//2, FRAME_H//2])
+              # rotate means to where other car would be
+              # from perspective of main car
+              x_rot, y_rot = list(rotate([y_wrt_o, x_wrt_o], center, my_ang))
+              # convert to rows and columns
+              r, c = y_rot, x_rot
+              # draw gaussian
               gaussian = draw2DGauss([r,c],[15,15])
               costmap += gaussian
-    return costmap
+    return pad_resize(costmap)
               
             
